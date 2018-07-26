@@ -37,17 +37,7 @@ from core.pipeline import *
 from bfx.design import *
 from bfx.readset import *
 
-from bfx import bedtools
-from bfx import cufflinks
-from bfx import differential_expression
-from bfx import gq_seq_utils
-from bfx import htseq
-from bfx import metrics
 from bfx import picard
-from bfx import samtools
-from bfx import star
-from bfx import bvatools
-from bfx import rmarkdown
 from pipelines import common
 
 from bfx import samtools_1_1
@@ -58,7 +48,7 @@ from bfx import integrate
 from bfx import ericscript
 from bfx import gunzip
 from bfx import merge_fastq
-from bfx import cff_convertion
+from bfx import cff_conversion
 from bfx import check_dna_support_before_next_exon
 from bfx import merge_and_reannotate_cff_fusion
 from bfx import repeat_filter
@@ -72,27 +62,31 @@ class RnaFusion(common.Illumina):
 	"""
 	RNAFusion Pipeline
 	================
-    The Gene Fusion pipeline identifies gene fusion events using RNA-seq FASTQ files. (WHICH ONES? WHICH STEP OUTPUTS THE NEEDED FILES??) 
+    The Gene Fusion pipeline identifies gene fusion events using RNA-seq FASTQ files.  
     Reads are mapped to reference genome using using TopHat2
-    Four separate tools detect fusion events: deFuse, FusionMap, EricScript, and INTEGRATE. 
+    
+    Four separate tools detect fusion events: 
+    [deFuse](https://sourceforge.net/p/defuse/wiki/DeFuse/), 
+    [FusionMap](http://www.arrayserver.com/wiki/index.php?title=FusionMap), 
+    [EricScript](https://sites.google.com/site/bioericscript/home), 
+    and [INTEGRATE](). 
     The results are combined into one common file (.cff) that gives information about gene fusions including gene names, 
     type of fusion (ex. read through vs. gene fusion), and the tools that identified each fusion event. 
     Additionally, if DNA sequencing information is available for the samples of interest, 
     the Gene Fusion Pipeline can check for DNA support of gene fusions detected from RNA. 
+    
+    The RNAseq pipeline requires a sampleinfo file to be provided, which is a tab-delimited document with each sample 
+    as a line with information about sample disease. The first column gives sample name, second column gives the disease name,
+    third column tells whether the sample comes from a tumor (TP) or normal (NT) tissue. Additional columns can give further 
+    information about samples.
+
+    In addition, a dnabam file must be provided, which gives the name of .bam file(s) associated with RNA-seq sample.
+    If there is no DNA sequencing associated with the sample, provide the name of an empty file
 
     Example command: 
-    python rnaseq_fusion.py -r readset.tsv –s x,y –sampleinfo disease.sampleinfo –dnabam disease.bam –c rnaseq.fusion.ini
-
-    -sampleinfo: tab-delimited document with each sample as a line with information 
-                 about sample disease. First column gives sample name, second column gives the disease name, 
-                 third column tells whether the sample comes from a tumor (TP) or normal (NT) tissue. 
-                 Additional columns can give further information about samples.
-
-    -dnabam: name of .bam file(s) associated with RNA-seq sample. If there is no 
-             DNA sequencing associated with the sample, provide the name of an 
-             empty file
     
-    Finally, there is a script to further classify gene fusions based on disease type that is not part of the pipeline:
+    python rnaseq_fusion.py -r readset.tsv -s x,y -sampleinfo disease.sampleinfo -dnabam disease.bam -c rnaseq.fusion.ini
+    
 	"""
 
 	def __init__(self):
@@ -103,35 +97,6 @@ class RnaFusion(common.Illumina):
 
 
 ########### Fusion functions ###########
-	def select_input_fastq(self, sample):
-		"""
-		According to readset select input fastqs for fusion callers.
-		"""
-		input_dir = os.path.join("fusions", "gunzip_fastq", sample.name)
-		if len(sample.readsets) > 1: # sample has more than 1 readset, use merged fastq
-			fastq1 = os.path.join(input_dir, "merged.pair1.fastq")
-			fastq2 = os.path.join(input_dir, "merged.pair2.fastq")
-		else:
-			#input files are bams
-			readset = sample.readsets[0]
-			if readset.bam:
-				fastq1 = os.path.join(input_dir, os.path.basename(re.sub("\.bam$", ".pair1.fastq", readset.bam)))
-				fastq2 = os.path.join(input_dir, os.path.basename(re.sub("\.bam$", ".pair2.fastq", readset.bam)))
-			if readset.fastq1:
-				if readset.fastq1.endswith(".gz"):
-					# input files are gzipped fastqs
-					fastq1 = os.path.join(input_dir, os.path.basename(re.sub("\.gz$", "", readset.fastq1)))
-					fastq2 = os.path.join(input_dir, os.path.basename(re.sub("\.gz$", "", readset.fastq2)))
-				else:
-					# input files are fastqs
-					fastq1 = os.path.join(input_dir, os.path.basename(readset.fastq1))
-					fastq2 = os.path.join(input_dir, os.path.basename(readset.fastq2))
-			if readset.cram:
-				fastq1 = os.path.join(input_dir, os.path.basename(readset.cram)+".pair1.fastq")
-				fastq2 = os.path.join(input_dir, os.path.basename(readset.cram)+".pair2.fastq")
-		print >> sys.stderr, fastq1
-		print >> sys.stderr, fastq2
-		return fastq1, fastq2
 
 
 	def picard_sam_to_fastq(self):
@@ -183,24 +148,6 @@ class RnaFusion(common.Illumina):
 		return jobs
 
 
-	def defuse(self):
-		"""
-		Run Defuse to call gene fusion
-		"""
-		jobs = []
-		for sample in self.samples:
-			fastq1, fastq2 = self.select_input_fastq(sample)
-			out_dir = os.path.join("fusions", "defuse", sample.name)
-			defuse_job = defuse.defuse(fastq1, fastq2, out_dir)
-			job = concat_jobs([
-				Job(command="mkdir -p " + out_dir),
-				defuse_job
-			], name="defuse." + sample.name)
-
-			jobs.append(job)
-
-		return jobs
-
 	def gunzip_fastq(self):
 		"""
 		Gunzip .fastq.gz files 
@@ -239,6 +186,7 @@ class RnaFusion(common.Illumina):
 
 		return jobs
 
+
 	def merge_fastq(self):
 		"""
 		Merge paired end fastqs of the same sample
@@ -272,6 +220,56 @@ class RnaFusion(common.Illumina):
 
 		return jobs
 
+	def select_input_fastq(self, sample):
+		"""
+		Select input fastqs for fusion callers according to readset.
+        This function is called in the gene fusion caller functions.
+		"""
+		input_dir = os.path.join("fusions", "gunzip_fastq", sample.name)
+		if len(sample.readsets) > 1: # sample has more than 1 readset, use merged fastq
+			fastq1 = os.path.join(input_dir, "merged.pair1.fastq")
+			fastq2 = os.path.join(input_dir, "merged.pair2.fastq")
+		else:
+			#input files are bams
+			readset = sample.readsets[0]
+			if readset.bam:
+				fastq1 = os.path.join(input_dir, os.path.basename(re.sub("\.bam$", ".pair1.fastq", readset.bam)))
+				fastq2 = os.path.join(input_dir, os.path.basename(re.sub("\.bam$", ".pair2.fastq", readset.bam)))
+			if readset.fastq1:
+				if readset.fastq1.endswith(".gz"):
+					# input files are gzipped fastqs
+					fastq1 = os.path.join(input_dir, os.path.basename(re.sub("\.gz$", "", readset.fastq1)))
+					fastq2 = os.path.join(input_dir, os.path.basename(re.sub("\.gz$", "", readset.fastq2)))
+				else:
+					# input files are fastqs
+					fastq1 = os.path.join(input_dir, os.path.basename(readset.fastq1))
+					fastq2 = os.path.join(input_dir, os.path.basename(readset.fastq2))
+			if readset.cram:
+				fastq1 = os.path.join(input_dir, os.path.basename(readset.cram)+".pair1.fastq")
+				fastq2 = os.path.join(input_dir, os.path.basename(readset.cram)+".pair2.fastq")
+		print >> sys.stderr, fastq1
+		print >> sys.stderr, fastq2
+		return fastq1, fastq2
+
+
+	def defuse(self):
+		"""
+		Run Defuse to call gene fusion
+		"""
+		jobs = []
+		for sample in self.samples:
+			fastq1, fastq2 = self.select_input_fastq(sample)
+			out_dir = os.path.join("fusions", "defuse", sample.name)
+			defuse_job = defuse.defuse(fastq1, fastq2, out_dir)
+			job = concat_jobs([
+				Job(command="mkdir -p " + out_dir),
+				defuse_job
+			], name="defuse." + sample.name)
+
+			jobs.append(job)
+
+		return jobs
+
 
 	def fusionmap(self):
 		"""
@@ -293,6 +291,25 @@ class RnaFusion(common.Illumina):
 
 		return jobs
 
+
+	def ericscript(self):
+		"""
+		Run EricScript to call gene fusion
+		"""
+		jobs = []
+		for sample in self.samples:
+			fastq1, fastq2 = self.select_input_fastq(sample)
+			out_dir = os.path.join("fusions", "ericscript", sample.name)
+			ericscript_job = ericscript.ericscript(fastq1, fastq2, out_dir)
+			job = concat_jobs([
+				Job(command="mkdir -p " + out_dir),
+				Job(command="rm -r " + out_dir),
+				ericscript_job
+			], name="ericscript." + sample.name)
+
+			jobs.append(job)
+
+		return jobs	
 	
 	def tophat2(self):
 		"""
@@ -334,7 +351,6 @@ class RnaFusion(common.Illumina):
 			jobs.append(job)
 
 		return jobs
-
 	
 	def integrate_make_result_file(self):
 		"""
@@ -353,24 +369,6 @@ class RnaFusion(common.Illumina):
 
 		return jobs	
 		
-	def ericscript(self):
-		"""
-		Run EricScript to call gene fusion
-		"""
-		jobs = []
-		for sample in self.samples:
-			fastq1, fastq2 = self.select_input_fastq(sample)
-			out_dir = os.path.join("fusions", "ericscript", sample.name)
-			ericscript_job = ericscript.ericscript(fastq1, fastq2, out_dir)
-			job = concat_jobs([
-				Job(command="mkdir -p " + out_dir),
-				Job(command="rm -r " + out_dir),
-				ericscript_job
-			], name="ericscript." + sample.name)
-
-			jobs.append(job)
-
-		return jobs	
 
 	def convert_fusion_results_to_cff(self):
 		"""
@@ -401,10 +399,10 @@ class RnaFusion(common.Illumina):
 				raise Exception("Error: sample " + sample.name + " not found in design file " + self.args.design.name)
 			"""	
 			for tool, result_file in tool_results:
-				job = cff_convertion.cff_convert(sample.name, result_file, sampleinfo_file, tool, out_dir)
+				job = cff_conversion.cff_convert(sample.name, result_file, sampleinfo_file, tool, out_dir)
 				job.command = job.command.strip()
 				job_list.append(job)
-		job = concat_jobs(job_list, name="cff_convertion")
+		job = concat_jobs(job_list, name="cff_conversion")
 		jobs.append(job)
 		return jobs
 
@@ -445,22 +443,8 @@ class RnaFusion(common.Illumina):
 
 		jobs.append(job)
 		return jobs
-	
-	def cluster_reann_dnasupp_file(self):
-		"""
-		Check DNA support (pair clusters) until the start of next exon/utr
-		"""
-		jobs = []
-		out_dir = os.path.join("fusions", "cff")
-		cluster_job = merge_and_reannotate_cff_fusion.cluster_reann_dnasupp_file(out_dir)
-		
-		job = concat_jobs([
-			cluster_job	
-		], name="cluster_reann_dnasupp_file")
 
-		jobs.append(job)
-		return jobs
-		
+
 	def repeat_filter(self):
 		"""
 		Filter fusions with repetitive boundary sequences by realigning a certain length(WHAT CERTAIN LENGTH??) of sequnces with BWA
@@ -476,6 +460,22 @@ class RnaFusion(common.Illumina):
 
 		jobs.append(job)
 		return jobs
+
+	def cluster_reann_dnasupp_file(self):
+		"""
+		Check DNA support (pair clusters) until the start of next exon/utr
+		"""
+		jobs = []
+		out_dir = os.path.join("fusions", "cff")
+		cluster_job = merge_and_reannotate_cff_fusion.cluster_reann_dnasupp_file(out_dir)
+		
+		job = concat_jobs([
+			cluster_job	
+		], name="cluster_reann_dnasupp_file")
+
+		jobs.append(job)
+		return jobs
+		
 		
 	def delete_fastqs(self):
 		"""
