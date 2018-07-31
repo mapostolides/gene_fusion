@@ -26,11 +26,11 @@ import os
 from core.config import *
 from core.job import *
 
-
-
 def check_dna_support_before_next_exon(input_reann, bam_list_file, tmp_dir, annotation_file=None, ini_section='check_dna_support_before_next_exon'):
+
 	other_options = config.param(ini_section, 'other_options', required=False)
 	output_file = input_reann + ".dnasupp"
+
 	return Job(
 		[input_reann],
 		[output_file],

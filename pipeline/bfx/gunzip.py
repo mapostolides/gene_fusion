@@ -25,6 +25,7 @@ import zipfile
 # MUGQIC Modules
 from core.config import *
 from core.job import *
+
 def gunzip_fastq(infastqgz, out_dir, ini_section='gunzip_fastq'):
 	other_options = config.param(ini_section, 'other_options', required=False)
 	
@@ -35,8 +36,7 @@ def gunzip_fastq(infastqgz, out_dir, ini_section='gunzip_fastq'):
 			[outfastq],
 			[],
 			command="""\
-	zcat \\
-	{input} > {output}""".format(
+zcat {input} > {output}""".format(
 			input=infastqgz,	
 			output=outfastq
 			)

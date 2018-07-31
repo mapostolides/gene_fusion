@@ -25,20 +25,20 @@ import zipfile
 # MUGQIC Modules
 from core.config import *
 from core.job import *
+
 def merge_fastq(fastq1_list, fastq2_list, out_dir, ini_section='merge_fastq'):
+
 	other_options = config.param(ini_section, 'other_options', required=False)
-	
 	outfastq1 = os.path.join(out_dir, "merged.pair1.fastq")
 	outfastq2 = os.path.join(out_dir, "merged.pair2.fastq")
+
 	return Job(
 		fastq1_list + fastq2_list,
 		[outfastq1, outfastq2],
 		[],
 		command="""\
-cat \\
-{input1} > {output1} && \\
-cat \\
-{input2} > {output2}""".format(
+cat {input1} > {output1} && \\
+cat {input2} > {output2}""".format(
 		input1=" ".join(fastq1_list),	
 		output1=outfastq1,
 		input2=" ".join(fastq2_list),	

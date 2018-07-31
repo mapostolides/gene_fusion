@@ -26,12 +26,12 @@ import os
 from core.config import *
 from core.job import *
 
-
-
 def tophat2(in1fastq, in2fastq, out_dir, ini_section='tophat2'):
+
 	other_options = config.param(ini_section, 'other_options', required=False)
 	accepted_bam = os.path.join(out_dir, "accepted_hits.bam")
 	unmapped_bam = os.path.join(out_dir, "unmapped.bam")
+
 	return Job(
 		[in1fastq, in2fastq],
 		[os.path.join(out_dir, "accepted_hits.bam"), os.path.join(out_dir, "unmapped.bam")],
@@ -41,7 +41,8 @@ def tophat2(in1fastq, in2fastq, out_dir, ini_section='tophat2'):
 			["tophat", "module_samtools"]
 		],
 		command="""\
-/hpf/tools/centos6/tophat/2.0.13/tophat2 {other_options} -o {out_dir} /hpf/largeprojects/ccmbio/jiangyue/hg19_decoy/bowtie2_index/human_g1k_v37_decoy.fasta {in1fastq} {in2fastq} &&
+/hpf/tools/centos6/tophat/2.0.13/tophat2 {other_options} -o {out_dir} \\
+/hpf/largeprojects/ccmbio/jiangyue/hg19_decoy/bowtie2_index/human_g1k_v37_decoy.fasta {in1fastq} {in2fastq} && \\
 samtools index {accepted_bam}""".format(
 		other_options=" \\\n  " + other_options if other_options else "",
 		in1fastq=in1fastq,

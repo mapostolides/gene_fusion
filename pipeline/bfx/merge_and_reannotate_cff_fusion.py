@@ -26,18 +26,18 @@ import os
 from core.config import *
 from core.job import *
 
-
-
 def merge_and_reannotate_cff_fusion(input_cff, out_dir, annotation_file=None, reference_file=None, ini_section='merge_and_reannotate_cff_fusion'):
+
 	other_options = config.param(ini_section, 'other_options', required=False)
 	merged_cff = os.path.join(out_dir, "merged.cff")
+
 	return Job(
 		input_cff,
 		[merged_cff+".reann"],
 		[["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
 		command="""\
-cat {cff_files} > {out_dir}/merged.cff &&
-reann_cff_fusion.py {merged_cff} {annotation_file} {reference_file} > {merged_cff}.reann""".format(
+cat {cff_files} > {out_dir}/merged.cff && \\
+  reann_cff_fusion.py {merged_cff} {annotation_file} {reference_file} > {merged_cff}.reann""".format(
 		cff_files=" \\\n".join(input_cff),
 		out_dir=out_dir,
 		merged_cff=merged_cff,
@@ -48,12 +48,15 @@ reann_cff_fusion.py {merged_cff} {annotation_file} {reference_file} > {merged_cf
 	)
 
 def cluster_reann_dnasupp_file(out_dir, ini_section='merge_and_reannotate_cff_fusion', repeat_filter_section='repeat_filter'):
+
 	other_options = config.param(ini_section, 'other_options', required=False)
 	reann_dnasupp_file = os.path.join(out_dir, "merged.cff.reann.dnasupp")
+
 	# load seq_len used in repeat_filter step
 	seq_len = config.param(repeat_filter_section, 'seq_len', type='int')
 	repeat_filtered_file = os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
 	output_file = reann_dnasupp_file + ".cluster"
+
 	return Job(
 		[reann_dnasupp_file, repeat_filtered_file],
 		[output_file],

@@ -24,7 +24,6 @@
 # for convertion of our cram2.0 file to bam only
 # "view" is the only command
 
-#/hpf/tools/centos6/samtools/1.1/bin/samtools view -b $cram  -o $cram_bam
 from core.config import *
 from core.job import *
 

@@ -26,40 +26,8 @@ import os
 from core.config import *
 from core.job import *
 
-
-
-#def fusionmap(in1fastq, in2fastq, out_dir, config_file=None, ini_section='fusionmap'):
-#	other_options = config.param(ini_section, 'other_options', required=False)
-#	out_prefix = "02_RNA"
-#	fastq_path = os.path.dirname(in1fastq)
-#	link1fastq = os.path.join(fastq_path, "tmplink_1.fastq")
-#	fastq_path = os.path.dirname(in2fastq)
-#	link2fastq = os.path.join(fastq_path, "tmplink_2.fastq")
-#	result_file = os.path.join(out_dir, "02_RNA.FusionReport.txt")
-#	return Job(
-#		[in1fastq, in2fastq, config_file if config_file else None],
-#		[result_file],
-#		[["fusionmap", "module_fusionmap"]],
-#		command="""\
-#ln -sf $PWD/{in1fastq} {link1fastq} &&
-#ln -sf $PWD/{in2fastq} {link2fastq} &&
-#echo "\n<Files>\n{link1fastq}\n{link2fastq}\n<Output>\nTempPath={out_dir}/FusionMapTemp\nOutputPath={out_dir}\nOutputName={out_prefix}" >{out_dir}/tmp.cfg &&
-#cat {out_dir}/tmp.cfg {config_file} >{out_dir}/fusionmap.cfg &&
-#/hpf/tools/centos6/mono/2.10.9/bin/mono /hpf/largeprojects/ccmbio/jiangyue/tools/FusionMap/FusionMap_2015-03-31/bin/FusionMap.exe --semap /hpf/largeprojects/ccmbio/jiangyue/tools/FusionMap/FusionMap_2015-03-31 Human.B37.3 RefGene {out_dir}/fusionmap.cfg {other_options}""".format(
-#		other_options=" \\\n  " + other_options if other_options else "",
-#		config_file=config.param(ini_section, 'config_file'),
-#		in1fastq=in1fastq,
-#		in2fastq=in2fastq,
-#		link1fastq=link1fastq,
-#		link2fastq=link2fastq,
-#		out_dir=out_dir,
-#		out_prefix=out_prefix,
-#		fastq_path=fastq_path
-#		),
-#		removable_files=[]
-#	)
-
 def fusionmap(in1fastq, in2fastq, out_dir, config_file=None, ini_section='fusionmap'):
+
 	other_options = config.param(ini_section, 'other_options', required=False)
 	out_prefix = "02_RNA"
 	fastq_path = os.path.dirname(in1fastq)
@@ -67,6 +35,7 @@ def fusionmap(in1fastq, in2fastq, out_dir, config_file=None, ini_section='fusion
 	fastq_path = os.path.dirname(in2fastq)
 	link2fastq = os.path.join(fastq_path, "tmplink_2.fastq")
 	result_file = os.path.join(out_dir, "02_RNA.FusionReport.txt")
+
 	return Job(
 		[in1fastq, in2fastq, config_file if config_file else None],
 		[result_file],
