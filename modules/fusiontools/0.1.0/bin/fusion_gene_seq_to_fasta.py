@@ -9,8 +9,8 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--cff_file', action='store', type=file, help='CFF file, can be .cff or cff.reann')
-parser.add_argument('--seq_len', action='store', help='extracted fusion sequence length')
+parser.add_argument('--cff_file', action='store', type=file, help='CFF file, can be .cff or cff.reann', required=True)
+parser.add_argument('--seq_len', action='store', help='extracted fusion sequence length', required=True)
 
 args = parser.parse_args()
 

@@ -63,14 +63,16 @@ class RnaFusion(common.Illumina):
 	RNAFusion Pipeline
 	================
     The Gene Fusion pipeline identifies gene fusion events using RNA-seq FASTQ files.  
-    Reads are mapped to reference genome using using TopHat2
     
     Four separate tools detect fusion events: 
     [deFuse](https://sourceforge.net/p/defuse/wiki/DeFuse/), 
     [FusionMap](http://www.arrayserver.com/wiki/index.php?title=FusionMap), 
     [EricScript](https://sites.google.com/site/bioericscript/home), 
-    and [INTEGRATE](). 
-    The results are combined into one common file (.cff) that gives information about gene fusions including gene names, 
+    and [INTEGRATE](https://sourceforge.net/p/integrate-fusion/wiki/Home/).
+    
+    Tophat2 is used to generate precursor files for the INTEGRATE fusion detection tool.
+     
+    The fusion detection results are combined into one common file (.cff) that gives information about gene fusions including gene names, 
     type of fusion (ex. read through vs. gene fusion), and the tools that identified each fusion event. 
     Additionally, if DNA sequencing information is available for the samples of interest, 
     the Gene Fusion Pipeline can check for DNA support of gene fusions detected from RNA. 
@@ -85,7 +87,7 @@ class RnaFusion(common.Illumina):
 
     Example command: 
     
-    python rnaseq_fusion.py -r readset.tsv -s x,y -sampleinfo disease.sampleinfo -dnabam disease.bam -c rnaseq.fusion.ini
+    python rnaseq_fusion.py -r readset.tsv -s 1-14 --sampleinfo disease.sampleinfo --dnabam disease.bam -c rnaseq.fusion.ini
     
 	"""
 
@@ -94,9 +96,6 @@ class RnaFusion(common.Illumina):
 		self.argparser.add_argument("--sampleinfo", help="sample info file", type=file)
 		self.argparser.add_argument("--dnabam", help="DNA bam list", type=file)
 		super(RnaFusion, self).__init__()
-
-
-########### Fusion functions ###########
 
 
 	def picard_sam_to_fastq(self):
@@ -158,16 +157,13 @@ class RnaFusion(common.Illumina):
 			out_dir = os.path.join("fusions", "gunzip_fastq", readset.sample.name)
 			# Find input readset FASTQs first from previous trimmomatic job, then from original FASTQs in the readset sheet
 			if readset.run_type == "PAIRED_END":
-				#candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
 				candidate_input_files = []
 				if readset.fastq1 and readset.fastq2:
 					candidate_input_files.append([readset.fastq1, readset.fastq2])
 				if readset.bam:
-					#candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam), re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
 					picard_dir = os.path.join("fusions", "picard_sam_to_fastq", readset.sample.name)
 					candidate_input_files.append([os.path.join(picard_dir, os.path.basename(re.sub("\.bam$", ".pair1.fastq.gz", readset.bam))), os.path.join(picard_dir, os.path.basename(re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)))])
 				if readset.cram:
-					#candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam), re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
 					picard_dir = os.path.join("fusions", "picard_sam_to_fastq", readset.sample.name)
 					candidate_input_files.append([os.path.join(picard_dir, os.path.basename(readset.cram)+".pair1.fastq.gz"), os.path.join(picard_dir, os.path.basename(readset.cram)+".pair2.fastq.gz")])
 				[fastq1, fastq2] = self.select_input_files(candidate_input_files)
@@ -313,7 +309,8 @@ class RnaFusion(common.Illumina):
 	
 	def tophat2(self):
 		"""
-		Run Tophat2 for Integrate
+		Run Tophat2 for Integrate. Determines accepted hits and unmapped reads, and outputs 
+        corresponding .bam files required as input files for integrate step.
 		"""
 		jobs = []
 		for sample in self.samples:
@@ -372,7 +369,7 @@ class RnaFusion(common.Illumina):
 
 	def convert_fusion_results_to_cff(self):
 		"""
-		Convert fusion results to cff format
+		Convert fusion results of all 4 gene fusion callers to cff format
 		"""
 		jobs = []
 		out_dir = os.path.join("fusions", "cff")
@@ -447,7 +444,7 @@ class RnaFusion(common.Illumina):
 
 	def repeat_filter(self):
 		"""
-		Filter fusions with repetitive boundary sequences by realigning a certain length(WHAT CERTAIN LENGTH??) of sequnces with BWA
+		Filter fusions with repetitive boundary sequences by realigning a certain length of sequnces with BWA
 		"""
 		jobs = []
 		out_dir = os.path.join("fusions", "cff")
@@ -463,7 +460,7 @@ class RnaFusion(common.Illumina):
 
 	def cluster_reann_dnasupp_file(self):
 		"""
-		Check DNA support (pair clusters) until the start of next exon/utr
+		Reannotate DNA support (pair clusters) file
 		"""
 		jobs = []
 		out_dir = os.path.join("fusions", "cff")

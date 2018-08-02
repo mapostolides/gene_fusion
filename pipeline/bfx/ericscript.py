@@ -28,31 +28,36 @@ from core.job import *
 
 def ericscript(in1fastq, in2fastq, out_dir, config_file=None, ini_section='ericscript'):
 
-	other_options = config.param(ini_section, 'other_options', required=False)
-	result_file = os.path.join(out_dir, "fusion.results.filtered.tsv")
+    other_options = config.param(ini_section, 'other_options', required=False)
+    result_file = os.path.join(out_dir, "fusion.results.filtered.tsv")
 
-	return Job(
-		[in1fastq, in2fastq, config_file if config_file else None],
-		[result_file],
-		[
-			["ericscript", "module_bedtools"],
-			["ericscript", "module_blat"],
-			["ericscript", "module_samtools"],
-			["ericscript", "module_R_3_1_0"],
-			["ericscript", "module_bwa"],
-			["ericscript", "module_seqtk"]
+    return Job(
+        [in1fastq, in2fastq, config_file if config_file else None],
+        [result_file],
+        [
+            ["ericscript", "module_bedtools"],
+            ["ericscript", "module_blat"],
+            ["ericscript", "module_samtools"],
+            ["ericscript", "module_R_3_1_0"],
+            ["ericscript", "module_bwa"],
+            ["ericscript", "module_seqtk"]
 
-		],
-		command="""\
-export PATH=$PATH:/hpf/largeprojects/ccmbio/smark/gene_fusion/pipeline/ericscript-0.5.4/ && \\ 
-ericscript.nodbcheck.pl {other_options} -db /hpf/largeprojects/ccmbio/jiangyue/database/ericscript/ericscript_db_homosapiens_ensembl73 \\
--name "fusion" -o {out_dir} {in1fastq} {in2fastq} && \\ 
+        ],
+        command="""\
+export PATH=$PATH:/hpf/largeprojects/ccmbio/smark/gene_fusion/pipeline/ericscript-0.5.4/ && \\
+ericscript.nodbcheck.pl \\
+  {other_options} \\
+  -db /hpf/largeprojects/ccmbio/jiangyue/database/ericscript/ericscript_db_homosapiens_ensembl73 \\
+  -name "fusion" \\
+  -o {out_dir} \\
+  {in1fastq} \\
+  {in2fastq} && \\
 rm -rf {out_dir}/aln && rm -rf {out_dir}/out""".format(
-		other_options=" \\\n  " + other_options if other_options else "",
-		in1fastq=in1fastq,
-		in2fastq=in2fastq,
-		out_dir=out_dir
-		),
-		removable_files=[]
-	)
+        other_options=" \\\n  " + other_options if other_options else "",
+        in1fastq=in1fastq,
+        in2fastq=in2fastq,
+        out_dir=out_dir
+        ),
+        removable_files=[]
+    )
 

@@ -93,7 +93,8 @@ num_blat_sequences                          = 10000
 dna_concordant_length                       = 1000
 
 # Trim length for discordant reads (split reads are not trimmed)
-discord_read_trim                           = 50
+# 
+discord_read_trim                           = 30
 
 # Calculate extra annotations, fusion splice index and interrupted index
 calculate_extra_annotations                 = yes

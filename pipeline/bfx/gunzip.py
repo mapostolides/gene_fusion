@@ -27,29 +27,29 @@ from core.config import *
 from core.job import *
 
 def gunzip_fastq(infastqgz, out_dir, ini_section='gunzip_fastq'):
-	other_options = config.param(ini_section, 'other_options', required=False)
-	
-	if infastqgz.endswith(".gz"):
-		outfastq = os.path.join(out_dir, os.path.basename(os.path.splitext(infastqgz)[0]))
-		return Job(
-			[infastqgz],
-			[outfastq],
-			[],
-			command="""\
+    other_options = config.param(ini_section, 'other_options', required=False)
+    
+    if infastqgz.endswith(".gz"):
+        outfastq = os.path.join(out_dir, os.path.basename(os.path.splitext(infastqgz)[0]))
+        return Job(
+            [infastqgz],
+            [outfastq],
+            [],
+            command="""\
 zcat {input} > {output}""".format(
-			input=infastqgz,	
-			output=outfastq
-			)
-		)
-	else:
-		outfastq = os.path.join(out_dir, os.path.basename(infastqgz))
-		return Job(
-			[infastqgz],
-			[outfastq],
-			[],
-			command="""\
-	ln -fs {input}  {output}""".format(
-			input=infastqgz,	
-			output=outfastq
-			)
-		)
+            input=infastqgz,    
+            output=outfastq
+            )
+        )
+    else:
+        outfastq = os.path.join(out_dir, os.path.basename(infastqgz))
+        return Job(
+            [infastqgz],
+            [outfastq],
+            [],
+            command="""\
+    ln -fs {input}  {output}""".format(
+            input=infastqgz,    
+            output=outfastq
+            )
+        )

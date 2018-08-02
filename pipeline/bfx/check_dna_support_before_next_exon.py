@@ -28,21 +28,26 @@ from core.job import *
 
 def check_dna_support_before_next_exon(input_reann, bam_list_file, tmp_dir, annotation_file=None, ini_section='check_dna_support_before_next_exon'):
 
-	other_options = config.param(ini_section, 'other_options', required=False)
-	output_file = input_reann + ".dnasupp"
+    other_options = config.param(ini_section, 'other_options', required=False)
+    output_file = input_reann + ".dnasupp"
 
-	return Job(
-		[input_reann],
-		[output_file],
-		[["check_dna_support_before_next_exon", "module_fusiontools"]],
-		command="""\
-get_fusion_dna_supp_before_end_of_gene.py {reann_file} {bam_list_file} {annotation_file} {tmp_dir} > {output_file}""".format(
-		reann_file=input_reann,
-		output_file=output_file,
-		bam_list_file=bam_list_file,
-		tmp_dir=tmp_dir,
-		annotation_file=annotation_file if annotation_file else config.param(ini_section, 'annotation_file', type='filepath'),
-		),
-		removable_files=[os.path.join(tmp_dir, "dicordant.bam"), os.path.join(tmp_dir, "dicordant.bam.bai")]
-	)
+    return Job(
+        [input_reann],
+        [output_file],
+        [["check_dna_support_before_next_exon", "module_fusiontools"]],
+        command="""\
+get_fusion_dna_supp_before_end_of_gene.py \\
+  {reann_file} \\
+  {bam_list_file} \\
+  {annotation_file} \\
+  {tmp_dir} \\
+  > {output_file}""".format(
+        reann_file=input_reann,
+        output_file=output_file,
+        bam_list_file=bam_list_file,
+        tmp_dir=tmp_dir,
+        annotation_file=annotation_file if annotation_file else config.param(ini_section, 'annotation_file', type='filepath'),
+        ),
+        removable_files=[os.path.join(tmp_dir, "dicordant.bam"), os.path.join(tmp_dir, "dicordant.bam.bai")]
+    )
 

@@ -29,15 +29,15 @@ from core.job import *
 
 def repeat_filter(cff_file, out_dir, seq_len=None, ref_file=None, config_file=None, ini_section='repeat_filter'):
 
-	other_options = config.param(ini_section, 'other_options', required=False)
-	seq_len=seq_len if seq_len else config.param(ini_section, 'seq_len', type='int')
-	result_file = os.path.join(".".join([cff_file, "bwafilter", str(seq_len)]))
+    other_options = config.param(ini_section, 'other_options', required=False)
+    seq_len=seq_len if seq_len else config.param(ini_section, 'seq_len', type='int')
+    result_file = os.path.join(".".join([cff_file, "bwafilter", str(seq_len)]))
 
-	return Job(
-		[cff_file, ref_file, config_file if config_file else None],
-		[result_file],
-		[["bwa", "module_bwa"],['cff_conversion', 'module_fusiontools']],
-		command="""\
+    return Job(
+        [cff_file, ref_file, config_file if config_file else None],
+        [result_file],
+        [["bwa", "module_bwa"],['cff_conversion', 'module_fusiontools']],
+        command="""\
 fusion_gene_seq_to_fasta.py 
   --cff_file {cff_file} \\
   --seq_len {seq_len} \\
@@ -50,11 +50,11 @@ filter_fusion_on_bwa_aln.py \\
   > {cff_file}.bwafilter.{seq_len} && \\ 
 rm {cff_file}.fa && \\
 rm {cff_file}.fa.sam""".format(
-		other_options=" \\\n  " + other_options if other_options else "",
-		cff_file=cff_file,
-		seq_len=seq_len,
-		bwa_idx=ref_file if ref_file else config.param(ini_section, 'genome_bwa_index', type='filepath'),
-		),
-		removable_files=[os.path.join(out_dir, cff_file + ".fa"), os.path.join(out_dir, cff_file + ".fa.sam")]
-	)
+        other_options=" \\\n  " + other_options if other_options else "",
+        cff_file=cff_file,
+        seq_len=seq_len,
+        bwa_idx=ref_file if ref_file else config.param(ini_section, 'genome_bwa_index', type='filepath'),
+        ),
+        removable_files=[os.path.join(out_dir, cff_file + ".fa"), os.path.join(out_dir, cff_file + ".fa.sam")]
+    )
 
