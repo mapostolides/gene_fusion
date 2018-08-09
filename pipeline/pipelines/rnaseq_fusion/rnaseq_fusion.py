@@ -53,6 +53,7 @@ from bfx import check_dna_support_before_next_exon
 from bfx import merge_and_reannotate_cff_fusion
 from bfx import repeat_filter
 from bfx import fusion_stats
+from bfx import validate_fusions
 from bfx import delete_fastqs
 
 import utils
@@ -96,6 +97,8 @@ class RnaFusion(common.Illumina):
         # Add pipeline specific arguments
         self.argparser.add_argument("--sampleinfo", help="sample info file", type=file)
         self.argparser.add_argument("--dnabam", help="DNA bam list", type=file)
+        # add optional fusion validation file for pipeline validation mode
+        self.argparser.add_argument("--valfile", required=False, help="fusion validation set file", type=file)
         super(RnaFusion, self).__init__()
 
 
@@ -251,7 +254,7 @@ class RnaFusion(common.Illumina):
 
     def defuse(self):
         """
-        Run Defuse to call gene fusion
+        Run Defuse to call gene fusions
         """
         jobs = []
         for sample in self.samples:
@@ -270,7 +273,7 @@ class RnaFusion(common.Illumina):
 
     def fusionmap(self):
         """
-        Run FusionMap to call gene fusion
+        Run FusionMap to call gene fusions
         """
         jobs = []
         for sample in self.samples:
@@ -291,7 +294,7 @@ class RnaFusion(common.Illumina):
 
     def ericscript(self):
         """
-        Run EricScript to call gene fusion
+        Run EricScript to call gene fusions
         """
         jobs = []
         for sample in self.samples:
@@ -499,6 +502,29 @@ class RnaFusion(common.Illumina):
         jobs.append(job)
         return jobs
 
+    def validate_fusions(self):
+        """
+        Compares the pipeline output in merged.cff.reann.dnasupp.bwafilter.30.cluster with the predetermined
+        fusion gene test file. Outputs statistics about the detected gene fusions. This 
+        step should be run only with a test .bam/.fastq file, in order to validate fusions that are known to be
+        present in this sequence data.
+        Requires that the --val flag is used, and that the input file has the 5' and 3' fusion genes in the first
+        and second column, respectively.
+        """
+        #output_fusions = os.path.join("fusions", "cff", "merged.cff.reann.dnasupp.bwafilter.30.cluster")
+        in_dir = os.path.join("fusions", "cff")
+        out_dir = os.path.join("fusions", "validate_fusions")
+        jobs = []
+        
+        validate_fusions_job = validate_fusions.validate_fusions(in_dir, out_dir, self.args.valfile.name)
+
+        job = concat_jobs([
+            Job(command="mkdir -p " + out_dir),
+            validate_fusions_job
+        ], name="validate_fusions")
+
+        jobs.append(job)
+        return jobs
 
     def delete_fastqs(self):
         """
@@ -537,6 +563,7 @@ class RnaFusion(common.Illumina):
             self.repeat_filter,
             self.cluster_reann_dnasupp_file,
             self.fusion_stats,
+            self.validate_fusions,
             self.delete_fastqs
         ]
 

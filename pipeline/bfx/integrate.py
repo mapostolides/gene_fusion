@@ -37,10 +37,13 @@ def integrate(accepted_bam, unmapped_bam, out_dir, ini_section='integrate'):
         [breakpoints_file, reads_file],
         [["bwa", "module_bwa"]],
         command="""\
-/hpf/largeprojects/ccmbio/jiangyue/tools/INTEGRATE_0_2_0/Integrate/INTEGRATE-build/bin/Integrate fusion {other_options} \\ 
-/hpf/largeprojects/ccmbio/jiangyue/hg19_decoy/human_g1k_v37_decoy.fasta \\
-/hpf/largeprojects/ccmbio/jiangyue/tools/INTEGRATE_0_2_0/Integrate/annot.ucsc.txt \\
-/hpf/largeprojects/ccmbio/jiangyue/hg19_decoy/integrate_index {accepted_bam} {unmapped_bam}""".format(
+/hpf/largeprojects/ccmbio/jiangyue/tools/INTEGRATE_0_2_0/Integrate/INTEGRATE-build/bin/Integrate fusion \\
+  {other_options} \\
+  /hpf/largeprojects/ccmbio/jiangyue/hg19_decoy/human_g1k_v37_decoy.fasta \\
+  /hpf/largeprojects/ccmbio/jiangyue/tools/INTEGRATE_0_2_0/Integrate/annot.ucsc.txt \\
+  /hpf/largeprojects/ccmbio/jiangyue/hg19_decoy/integrate_index \\
+  {accepted_bam} \\
+  {unmapped_bam}""".format(
         other_options=" \\\n  " + other_options if other_options else "",
         accepted_bam=accepted_bam,
         unmapped_bam=unmapped_bam
