@@ -58,6 +58,22 @@ from bfx import delete_fastqs
 
 import utils
 
+from bfx import bedtools
+from bfx import cufflinks
+from bfx import differential_expression
+from bfx import gq_seq_utils
+from bfx import htseq
+from bfx import metrics
+from bfx import picard
+from bfx import samtools
+from bfx import star
+from bfx import bvatools
+from bfx import rmarkdown
+from pipelines import common
+import utils
+
+
+
 log = logging.getLogger(__name__)
 
 class RnaFusion(common.Illumina):
@@ -71,7 +87,11 @@ class RnaFusion(common.Illumina):
     [FusionMap](http://www.arrayserver.com/wiki/index.php?title=FusionMap), 
     [EricScript](https://sites.google.com/site/bioericscript/home), 
     and [INTEGRATE](https://sourceforge.net/p/integrate-fusion/wiki/Home/).
-    
+   
+    Note that the discord_read_trim parameter in the defuse configuration file should be set according to the mean fragment length.
+    See [HERE](https://sourceforge.net/p/defuse/wiki/FAQ/) for more information. You can get the mean fragment length for your sample
+    by running defuse, and then looking at the defuse log file in the job_output folder
+ 
     Tophat2 is used to generate precursor files for the INTEGRATE fusion detection tool.
      
     The fusion detection results are combined into one common file (.cff) that gives information about gene fusions including gene names, 
@@ -85,12 +105,15 @@ class RnaFusion(common.Illumina):
     information about samples.
 
     In addition, a dnabam file must be provided, which gives the name of .bam file(s) associated with RNA-seq sample.
-    If there is no DNA sequencing associated with the sample, provide the name of an empty file
+    If there is no DNA sequencing associated with the sample, provide the name of an empty file    
 
-    Example command: 
+    For validation, an optional file containing fusion gene pairs can be provided with the --valfile flag. Used
+    only if the validate_fusions step is being run, and assumes that the input sequence data contains the fusions provided in 
+    the validation file. This step tests the effectiveness of the pipeline in detecting known fusions.
     
-    python rnaseq_fusion.py -r readset.tsv -s 1-14 --sampleinfo disease.sampleinfo --dnabam disease.bam -c rnaseq.fusion.ini
-    
+    Notes:
+    -integrate and fusionmap are the least computationally intensive, ericscript is more intensive, 
+    and defuse is the most computationally intensive
     """
 
     def __init__(self):
@@ -100,7 +123,6 @@ class RnaFusion(common.Illumina):
         # add optional fusion validation file for pipeline validation mode
         self.argparser.add_argument("--valfile", required=False, help="fusion validation set file", type=file)
         super(RnaFusion, self).__init__()
-
 
     def picard_sam_to_fastq(self):
         """
@@ -150,14 +172,12 @@ class RnaFusion(common.Illumina):
                     raise Exception("Error: BAM file not available for readset \"" + readset.name + "\"!")
         return jobs
 
-
     def gunzip_fastq(self):
         """
         Gunzip .fastq.gz files 
         """
         jobs = []
         for readset in self.readsets:
-            trim_file_prefix = os.path.join("trim", readset.sample.name, readset.name + ".trim.")
             out_dir = os.path.join("fusions", "gunzip_fastq", readset.sample.name)
             # Find input readset FASTQs first from previous trimmomatic job, then from original FASTQs in the readset sheet
             if readset.run_type == "PAIRED_END":
@@ -226,6 +246,7 @@ class RnaFusion(common.Illumina):
         This function is called in the gene fusion caller functions.
         """
         input_dir = os.path.join("fusions", "gunzip_fastq", sample.name)
+          
         if len(sample.readsets) > 1: # sample has more than 1 readset, use merged fastq
             fastq1 = os.path.join(input_dir, "merged.pair1.fastq")
             fastq2 = os.path.join(input_dir, "merged.pair2.fastq")
@@ -332,7 +353,7 @@ class RnaFusion(common.Illumina):
 
     def integrate(self):
         """
-        Run Integrate to call gene fusion
+        Run Integrate to call gene fusions
         """
         jobs = []
         for sample in self.samples:
@@ -385,7 +406,8 @@ class RnaFusion(common.Illumina):
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
-            tool_results = [("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            #tool_results = [("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            tool_results = [("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
             """
             sample_type = ""
             for contrast in self.contrasts:
@@ -415,7 +437,8 @@ class RnaFusion(common.Illumina):
         cff_files = []
         cff_dir = os.path.join("fusions", "cff")
         out_dir = os.path.join("fusions", "cff")
-        tool_list = ["defuse", "fusionmap", "ericscript", "integrate"]
+        #tool_list = ["defuse", "fusionmap", "ericscript", "integrate"]
+        tool_list = ["fusionmap", "ericscript", "integrate"]
         for tool in tool_list:
             cff_files.extend([os.path.join(cff_dir, sample.name+"."+tool+".cff") for sample in self.samples])
         
@@ -465,7 +488,7 @@ class RnaFusion(common.Illumina):
     def cluster_reann_dnasupp_file(self):
         """
         Reannotate DNA support (pair clusters) file. This step generates the final category/cluster file,
-        merged.cff.reann.dnasupp.bwafilter.30.cluster, which has the following columns:
+        merged.cff.reann.dnasupp.bwafilter.<seq-len>.cluster, which has the following columns:
             cluster_type, gene1, gene2, max_split_cnt, max_span_cnt, sample_type, disease, tools, inferred_fusion_type,
             gene1_on_bnd, gene1_close_to_bnd, gene2_on_bnd, gene2_close_to_bnd, dna_supp, samples
   
@@ -486,6 +509,7 @@ class RnaFusion(common.Illumina):
     
     def fusion_stats(self):
         """
+        Genereates a file containing statistics about detected fusions.
         """
         jobs = []
         in_dir = os.path.join("fusions", "cff")
@@ -505,11 +529,10 @@ class RnaFusion(common.Illumina):
     def validate_fusions(self):
         """
         Compares the pipeline output in merged.cff.reann.dnasupp.bwafilter.30.cluster with the predetermined
-        fusion gene test file. Outputs statistics about the detected gene fusions. This 
-        step should be run only with a test .bam/.fastq file, in order to validate fusions that are known to be
-        present in this sequence data.
-        Requires that the --val flag is used, and that the input file has the 5' and 3' fusion genes in the first
-        and second column, respectively.
+        fusion gene test file. Outputs statistics and plots about the detected gene fusions. This 
+        step should be run only with a test .bam/.fastq file, in order to confirm detection of validated fusions 
+        which are known to bepresent in the sample.
+        Requires --valfile flag, with corresponding file containing gene pairs
         """
         #output_fusions = os.path.join("fusions", "cff", "merged.cff.reann.dnasupp.bwafilter.30.cluster")
         in_dir = os.path.join("fusions", "cff")
@@ -549,6 +572,7 @@ class RnaFusion(common.Illumina):
     def steps(self):
         return [
             self.picard_sam_to_fastq,
+            self.trimmomatic,
             self.gunzip_fastq,
             self.merge_fastq,
             self.defuse,

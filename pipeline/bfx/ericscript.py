@@ -30,7 +30,9 @@ def ericscript(in1fastq, in2fastq, out_dir, config_file=None, ini_section='erics
 
     other_options = config.param(ini_section, 'other_options', required=False)
     result_file = os.path.join(out_dir, "fusion.results.filtered.tsv")
-
+    ericscript_path = "/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/ericscript-0.5.4/"
+    database_path = "/hpf/largeprojects/ccmbio/jiangyue/database/ericscript/ericscript_db_homosapiens_ensembl73"
+    #database_path = "/hpf/largeprojects/ccmbio/mapostolides/database/ericscript_db"
     return Job(
         [in1fastq, in2fastq, config_file if config_file else None],
         [result_file],
@@ -44,16 +46,18 @@ def ericscript(in1fastq, in2fastq, out_dir, config_file=None, ini_section='erics
 
         ],
         command="""\
-export PATH=$PATH:/hpf/largeprojects/ccmbio/smark/gene_fusion/pipeline/ericscript-0.5.4/ && \\
+export PATH=$PATH:{ericscript_path} && \\
 ericscript.nodbcheck.pl \\
   {other_options} \\
-  -db /hpf/largeprojects/ccmbio/jiangyue/database/ericscript/ericscript_db_homosapiens_ensembl73 \\
+  -db {database_path} \\
   -name "fusion" \\
   -o {out_dir} \\
   {in1fastq} \\
   {in2fastq} && \\
 rm -rf {out_dir}/aln && rm -rf {out_dir}/out""".format(
+        ericscript_path=ericscript_path,
         other_options=" \\\n  " + other_options if other_options else "",
+        database_path=database_path,
         in1fastq=in1fastq,
         in2fastq=in2fastq,
         out_dir=out_dir
