@@ -572,7 +572,7 @@ class RnaFusion(common.Illumina):
     def steps(self):
         return [
             self.picard_sam_to_fastq,
-            self.trimmomatic,
+            #self.trimmomatic,
             self.gunzip_fastq,
             self.merge_fastq,
             self.defuse,

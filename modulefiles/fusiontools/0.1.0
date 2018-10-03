@@ -1,0 +1,17 @@
+#%Module -*- tcl -*-
+##
+## modulefile
+##
+proc ModulesHelp { } {
+
+  puts stderr "\tAdds Fusion pipeline scripts to your environment variables,"
+}
+
+module-whatis "adds Fusion pipeline scripts to your environment variables."
+
+set              program           fusiontools
+set              version           0.1.0
+set              toolsdir          /hpf/largeprojects/ccmbio/mapostolides/mugqic_tools-my-version/python-tools
+set              root              $toolsdir/$program/$version
+
+prepend-path      PATH              $root/bin
