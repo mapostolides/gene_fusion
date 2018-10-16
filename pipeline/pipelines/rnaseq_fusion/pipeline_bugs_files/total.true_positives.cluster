@@ -1,0 +1,17 @@
+Gene_Cluster	PGAP2	PORCN	65	50	Tumor	VALIDATION	integrate,defuse,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr11	3845365	chrX	48374278
+Gene_Cluster	PFKM	UBXN10	56	53	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr12	48524219	chr1	20517040
+Gene_Cluster	TOX4	PFKFB3	152	117	Tumor	VALIDATION	integrate,defuse,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr14	21957009	chr10	6259098
+Gene_Cluster	RAB15	FAM228A	7	7	Tumor	VALIDATION	defuse,ericscript	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr14	65417661	chr2	24413281
+BP_Cluster	RAB15	NA	5	-1	Tumor	VALIDATION	fusionmap	TruncatedCoding	True	True	False	False	-1	smc_rna_sim45	chr14	65417661	chr2	24413281
+Gene_Cluster	PRKCB	PRPF31	34	22	Tumor	VALIDATION	integrate,defuse,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr16	23999911	chr19	54627878
+Gene_Cluster	FLYWCH2	PIWIL2	32	35	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr16	2933367	chr8	22212862
+Gene_Cluster	SYT4	TANK	12	11	Tumor	VALIDATION	integrate,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr18	40853545	chr2	162036125
+Gene_Cluster	TMEM59L	MED31	113	141	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr19	18727912	chr17	6553398
+Gene_Cluster	HES1	IFNL1	43	41	Tumor	VALIDATION	integrate,defuse,ericscript	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr3	193854837	chr19	39787445
+BP_Cluster	HES1	NA	20	-1	Tumor	VALIDATION	fusionmap	TruncatedCoding	True	True	False	False	-1	smc_rna_sim45	chr3	193854837	chr19	39787445
+Gene_Cluster	TSPAN5	NISCH	199	221	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr4	99397564	chr3	52512113
+Gene_Cluster	PRDM6	RASEF	82	90	Tumor	VALIDATION	integrate,defuse,ericscript	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr5	122425214	chr9	85670598
+Gene_Cluster	AK9	CYP7B1	71	71	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr6	109977959	chr8	65509486
+Gene_Cluster	TMEM249	TRIM8	66	84	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr8	145577614	chr10	104414410
+Gene_Cluster	SPTAN1	IFNGR2	33	25	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chr9	131388257	chr21	34787195
+Gene_Cluster	CT47B1	DMC1	503	573	Tumor	VALIDATION	integrate,defuse,ericscript,fusionmap	GeneFusion	True	True	True	True	-1	smc_rna_sim45	chrX	120008750	chr22	38963632
