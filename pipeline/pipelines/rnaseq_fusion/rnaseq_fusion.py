@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import sys
+from collections import defaultdict
 
 # Append mugqic_pipelines directory to Python library path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0])))))
@@ -37,10 +38,8 @@ from core.pipeline import *
 from bfx.design import *
 from bfx.readset import *
 
-from bfx import picard
-from pipelines import common
-
 from bfx import samtools_1_1
+from bfx import star_fusion
 from bfx import defuse
 from bfx import fusionmap
 from bfx import tophat2
@@ -49,6 +48,7 @@ from bfx import ericscript
 from bfx import gunzip
 from bfx import merge_fastq
 from bfx import cff_conversion
+#from bfx import fusioninspector
 from bfx import check_dna_support_before_next_exon
 from bfx import merge_and_reannotate_cff_fusion
 from bfx import repeat_filter
@@ -143,6 +143,215 @@ class RnaFusion(common.Illumina):
         # add optional fusion validation file for pipeline validation mode
         self.argparser.add_argument("--valfile", required=False, help="fusion validation set file", type=file)
         super(RnaFusion, self).__init__()
+
+    def star(self):
+        """
+        The filtered reads are aligned to a reference genome. The alignment is done per readset of sequencing
+        using the [STAR](https://code.google.com/p/rna-star/) software. It generates a Binary Alignment Map file (.bam).
+
+        This step takes as input files:
+
+        1. Trimmed FASTQ files if available
+        2. Else, FASTQ files from the readset file if available
+        3. Else, FASTQ output files from previous picard_sam_to_fastq conversion of BAM files
+        """
+
+        jobs = []
+        project_index_directory = "reference.Merged"
+        project_junction_file = os.path.join("alignment_1stPass", "AllSamples.SJ.out.tab")
+        individual_junction_list=[]
+        ######
+        #pass 1 -alignment
+        for readset in self.readsets:
+            trim_file_prefix = os.path.join("trim", readset.sample.name, readset.name + ".trim.")
+            alignment_1stPass_directory = os.path.join("alignment_1stPass", readset.sample.name, readset.name)
+            individual_junction_list.append(os.path.join(alignment_1stPass_directory,"SJ.out.tab"))
+
+            if readset.run_type == "PAIRED_END":
+                candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
+                if readset.fastq1 and readset.fastq2:
+                    candidate_input_files.append([readset.fastq1, readset.fastq2])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam), re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
+                [fastq1, fastq2] = self.select_input_files(candidate_input_files)
+            elif readset.run_type == "SINGLE_END":
+                candidate_input_files = [[trim_file_prefix + "single.fastq.gz"]]
+                if readset.fastq1:
+                    candidate_input_files.append([readset.fastq1])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".single.fastq.gz", readset.bam)])
+                [fastq1] = self.select_input_files(candidate_input_files)
+                fastq2 = None
+            else:
+                raise Exception("Error: run type \"" + readset.run_type +
+                "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END or SINGLE_END)!")
+
+            rg_platform = config.param('star_align', 'platform', required=False)
+            rg_center = config.param('star_align', 'sequencing_center', required=False)
+
+            job = star.align(
+                reads1=fastq1,
+                reads2=fastq2,
+                output_directory=alignment_1stPass_directory,
+                genome_index_folder=None,
+                rg_id=readset.name,
+                rg_sample=readset.sample.name,
+                rg_library=readset.library if readset.library else "",
+                rg_platform_unit=readset.run + "_" + readset.lane if readset.run and readset.lane else "",
+                rg_platform=rg_platform if rg_platform else "",
+                rg_center=rg_center if rg_center else ""
+            )
+            job.name = "star_align.1." + readset.name
+            jobs.append(job)
+        
+        ######
+        jobs.append(concat_jobs([
+        #pass 1 - contatenate junction
+        star.concatenate_junction(
+            input_junction_files_list=individual_junction_list,
+            output_junction_file=project_junction_file
+        ),
+        #pass 1 - genome indexing
+        star.index(
+            genome_index_folder=project_index_directory,
+            junction_file=project_junction_file
+        )], name = "star_index.AllSamples"))
+
+        ######
+        #Pass 2 - alignment
+        for readset in self.readsets:
+            trim_file_prefix = os.path.join("trim", readset.sample.name, readset.name + ".trim.")
+            alignment_2ndPass_directory = os.path.join("alignment", readset.sample.name, readset.name)
+
+            if readset.run_type == "PAIRED_END":
+                candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
+                if readset.fastq1 and readset.fastq2:
+                    candidate_input_files.append([readset.fastq1, readset.fastq2])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam), re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
+                [fastq1, fastq2] = self.select_input_files(candidate_input_files)
+            elif readset.run_type == "SINGLE_END":
+                candidate_input_files = [[trim_file_prefix + "single.fastq.gz"]]
+                if readset.fastq1:
+                    candidate_input_files.append([readset.fastq1])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".single.fastq.gz", readset.bam)])
+                [fastq1] = self.select_input_files(candidate_input_files)
+                fastq2 = None
+            else:
+                raise Exception("Error: run type \"" + readset.run_type +
+                "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END or SINGLE_END)!")
+
+            rg_platform = config.param('star_align', 'platform', required=False)
+            rg_center = config.param('star_align', 'sequencing_center', required=False)
+
+            job = star.align(
+                reads1=fastq1,
+                reads2=fastq2,
+                output_directory=alignment_2ndPass_directory,
+                genome_index_folder=project_index_directory,
+                rg_id=readset.name,
+                rg_sample=readset.sample.name,
+                rg_library=readset.library if readset.library else "",
+                rg_platform_unit=readset.run + "_" + readset.lane if readset.run and readset.lane else "",
+                rg_platform=rg_platform if rg_platform else "",
+                rg_center=rg_center if rg_center else "",
+                create_wiggle_track=True,
+                search_chimeres=True,
+                cuff_follow=True,
+                sort_bam=True
+            )
+            job.input_files.append(os.path.join(project_index_directory, "SAindex"))
+ 
+            # If this readset is unique for this sample, further BAM merging is not necessary.
+            # Thus, create a sample BAM symlink to the readset BAM.
+            # remove older symlink before otherwise it raise an error if the link already exist (in case of redo)
+            if len(readset.sample.readsets) == 1:
+                readset_bam = os.path.join(alignment_2ndPass_directory, "Aligned.sortedByCoord.out.bam")
+                sample_bam = os.path.join("alignment", readset.sample.name ,readset.sample.name + ".sorted.bam")
+                job = concat_jobs([
+                    job,
+                    Job([readset_bam], [sample_bam], command="ln -s -f " + os.path.relpath(readset_bam, os.path.dirname(sample_bam)) + " " + sample_bam, removable_files=[sample_bam])])
+
+            job.name = "star_align.2." + readset.name
+            jobs.append(job)
+
+        report_file = os.path.join("report", "RnaSeq.star.md")
+        jobs.append(
+            Job(
+                [os.path.join("alignment", readset.sample.name, readset.name, "Aligned.sortedByCoord.out.bam") for readset in self.readsets],
+                [report_file],
+                [['star', 'module_pandoc']],
+                command="""\
+mkdir -p report && \\
+pandoc --to=markdown \\
+  --template {report_template_dir}/{basename_report_file} \\
+  --variable scientific_name="{scientific_name}" \\
+  --variable assembly="{assembly}" \\
+  {report_template_dir}/{basename_report_file} \\
+  > {report_file}""".format(
+                    scientific_name=config.param('star', 'scientific_name'),
+                    assembly=config.param('star', 'assembly'),
+                    report_template_dir=self.report_template_dir,
+                    basename_report_file=os.path.basename(report_file),
+                    report_file=report_file
+                ),
+                report_files=[report_file],
+                name="star_report")
+        )
+
+        return jobs
+
+#    def run_star_fusion(self):
+#        """
+#        STAR-Fusion is a component of the Trinity Cancer Transcriptome Analysis Toolkit (CTAT). Based on the STAR aligner it identifies candidate fusion transcripts supported by Illumina reads. 
+#        https://github.com/STAR-Fusion/STAR-Fusion/wiki
+#        """
+#
+#        jobs = []
+#        
+#        left_fastqs = defaultdict(list)
+#        right_fastqs = defaultdict(list)
+#
+#        for readset in self.readsets:
+#            trim_file_prefix = os.path.join("trim", readset.sample.name, readset.name + "-trimmed-")
+#            
+#            if  readset.run_type == "PAIRED_END":
+#                candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
+#                if readset.fastq1 and readset.fastq2:
+#                    candidate_input_files.append([readset.fastq1, readset.fastq2])
+#                if readset.bam:
+#                    candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam), re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
+#                [fastq1, fastq2] = self.select_input_files(candidate_input_files)
+#            elif readset.run_type == "SINGLE_END":
+#                candidate_input_files = [[trim_file_prefix + "single.fastq.gz"]]
+#                if readset.fastq1:
+#                    candidate_input_files.append([readset.fastq1])
+#                if readset.bam:
+#                    candidate_input_files.append([re.sub("\.bam$", ".single.fastq.gz", readset.bam)])
+#                [fastq1] = self.select_input_files(candidate_input_files)
+#                fastq2 = None
+#
+#            else:
+#                raise Exception("Error: run type \"" + readset.run_type +
+#                    "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END or SINGLE_END)!")
+#
+#            left_fastqs[readset.sample.name].append(fastq1)
+#            right_fastqs[readset.sample.name].append(fastq2)
+#
+#        for sample in self.samples:
+#            output_dir = os.path.join("fusion", sample.name, "star_fusion")
+#            
+#            mkdir_job = Job(command="mkdir -p " + output_dir)
+#  
+#            job = concat_jobs([
+#                mkdir_job,
+#                star_fusion.run(left_fastqs[sample.name], right_fastqs[sample.name], output_dir)
+#            ], name="run_star_fusion." + sample.name)
+#            job.samples = [sample]
+#            jobs.append(job)
+#
+#        return jobs
 
     def picard_sam_to_fastq(self):
         """
@@ -292,6 +501,26 @@ class RnaFusion(common.Illumina):
         print >> sys.stderr, fastq2
         return fastq1, fastq2
 
+    def star_fusion(self):
+        """
+        Run STAR-Fusion to call gene fusions
+        """
+        jobs = []
+        CTAT_resource_lib="/hpf/largeprojects/ccmbio/mapostolides/validate_fusion/test_star_star-fusion/GRCh37_v19_CTAT_lib_Feb092018.plug-n-play/ctat_genome_lib_build_dir"
+        for sample in self.samples:
+            fastq1, fastq2 = self.select_input_fastq(sample)
+            out_dir = os.path.join("fusions", "star_fusion", sample.name)
+            #star_fusion_job = star_fusion.star_fusion(fastq1, fastq2, out_dir, CTAT_resource_lib)
+            star_fusion_job = star_fusion.star_fusion(fastq1, fastq2, CTAT_resource_lib, out_dir)
+            job = concat_jobs([
+                Job(command="mkdir -p " + out_dir),
+                star_fusion_job
+            ], name="star_fusion." + sample.name)
+
+            jobs.append(job)
+
+        return jobs
+
 
     def defuse(self):
         """
@@ -318,9 +547,13 @@ class RnaFusion(common.Illumina):
         """
         jobs = []
         for sample in self.samples:
+            # add pipeline top outpud dir as input to bfx fusionmap script
+            # self._output_dir assigned from command line args in pipeline.py
+            top_dir = self._output_dir
+
             fastq1, fastq2 = self.select_input_fastq(sample)
             out_dir = os.path.join("fusions", "fusionmap", sample.name)
-            fusionmap_job = fusionmap.fusionmap(fastq1, fastq2, out_dir)
+            fusionmap_job = fusionmap.fusionmap(fastq1, fastq2, out_dir, top_dir)
             job = concat_jobs([
                 Job(command="mkdir -p " + out_dir),
                 fusionmap_job,
@@ -420,14 +653,47 @@ class RnaFusion(common.Illumina):
         out_dir = os.path.join("fusions", "cff")
         job_list = [Job(command="mkdir -p " + out_dir)]
         sampleinfo_file = os.path.relpath(self.args.sampleinfo.name, self.output_dir)
+        
+#        #remove failed samples from analysis (optional)
+#        remove_failed_samples = 0 
+#        if (remove_failed_samples):
+#            failed_samples = []
+#            for sample in self.samples:
+#                #instantiate fusion caller result file paths
+#                star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
+#                defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
+#                fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")
+#                ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
+#                integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
+#                #check if sample output files have been generated, generate list of failed samples
+#                result_files = [star_fusion_result, defuse_result, fusionmap_result, ericscript_result, integrate_result]
+#                for i in range (0, len(result_files)):
+#                    file_exists = os.path.isfile(result_files[i])
+#                    if not (file_exists):
+#                        failed_samples.append(sample)
+#            #remove duplicates
+#            failed_samples = list(set(failed_samples))
+#            #remove failed samples from self.samples, remove them from analysis         
+#            print >> sys.stderr, "Original number of samples:" + str(len(self.samples))
+#            print >> sys.stderr, [sample.name for sample in self.samples]
+#            for sample in failed_samples:
+#                self.samples.remove(sample) 
+#            print >> sys.stderr,"subset of samples, failed removed:" + str(len(self.samples))
+#            print >> sys.stderr, [sample.name for sample in self.samples]
+#            #write filtered sample list to file for record
+#            #sample_file = open(os.path.join(self.output_dir, "processed_samples.txt"), 'w+')
+#            #sample_file.write(self.samples)
+#            #sample_file.close() 
+                    
         for sample in self.samples:
+            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
             defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
             fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
-            tool_results = [("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
-            #tool_results = [("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            #determine sample_type
             """
             sample_type = ""
             for contrast in self.contrasts:
@@ -440,7 +706,8 @@ class RnaFusion(common.Illumina):
                     break    
             if not sample_type:
                 raise Exception("Error: sample " + sample.name + " not found in design file " + self.args.design.name)
-            """    
+            """   
+            #convert caller output files to common fusion format(cff) 
             for tool, result_file in tool_results:
                 job = cff_conversion.cff_convert(sample.name, result_file, sampleinfo_file, tool, out_dir)
                 job.command = job.command.strip()
@@ -448,6 +715,22 @@ class RnaFusion(common.Illumina):
         job = concat_jobs(job_list, name="cff_conversion")
         jobs.append(job)
         return jobs
+
+#    def rename_genes(self):
+#
+#    rename_genes.rename_genes(cff_file, out_dir)
+#
+#
+#
+#    def fusioninspector(self):
+#
+#    fusioninspector.make_fusion_list_file(cff_file, out_dir) 
+#
+#    fusioninspector.run_fusioninspector
+#
+#
+#
+#    return jobs
 
     def merge_and_reannotate_cff_fusion(self):
         """
@@ -457,19 +740,22 @@ class RnaFusion(common.Illumina):
         cff_files = []
         cff_dir = os.path.join("fusions", "cff")
         out_dir = os.path.join("fusions", "cff")
-        tool_list = ["defuse", "fusionmap", "ericscript", "integrate"]
-        #tool_list = ["fusionmap", "ericscript", "integrate"]
+        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
         for tool in tool_list:
-            cff_files.extend([os.path.join(cff_dir, sample.name+"."+tool+".cff") for sample in self.samples])
-        
-        reann_job = merge_and_reannotate_cff_fusion.merge_and_reannotate_cff_fusion(cff_files, out_dir)
+            cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff") for sample in self.samples])
+        merge_job = merge_and_reannotate_cff_fusion.merge_cff_fusion(cff_files, out_dir)
         
         job = concat_jobs([
             reann_job    
-        ], name="merge_and_reannotate_cff_fusion")
+        ], name="merge_cff_fusion")
 
         jobs.append(job)
+
+        merged_cff_file = os.path.join("fusions", "cff", "merged.cff") 
+        reann_job = merge_and_reannotate_cff_fusion.reannotate_cff_fusion(merged_cff_file, out_dir)
+        #TODO implement reannotation step
         return jobs
+    
         
     def check_dna_support_before_next_exon(self):
         """
@@ -594,6 +880,7 @@ class RnaFusion(common.Illumina):
             self.picard_sam_to_fastq,
             self.gunzip_fastq,
             self.merge_fastq,
+            self.star_fusion,
             self.defuse,
             self.fusionmap,
             self.ericscript,

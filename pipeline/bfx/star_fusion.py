@@ -26,42 +26,45 @@ import os
 from core.config import *
 from core.job import *
 
-def ericscript(in1fastq, in2fastq, out_dir, config_file=None, ini_section='ericscript'):
+#def star_fusion(in1fastq, in2fastq, out_dir, CTAT_resource_lib, config_file=None, ini_section='star_fusion'):
+def star_fusion(in1fastq, in2fastq, CTAT_resource_lib, out_dir, config_file=None, ini_section='star_fusion'):
 
     other_options = config.param(ini_section, 'other_options', required=False)
-    result_file = os.path.join(out_dir, "fusion.results.filtered.tsv")
-    ericscript_path = "/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/ericscript-0.5.4/"
-    #database_path = "/hpf/largeprojects/ccmbio/jiangyue/database/ericscript/ericscript_db_homosapiens_ensembl73"
-    database_path = "/hpf/largeprojects/ccmbio/mapostolides/database/ericscript_db_homosapiens_ensembl73"
+    result_file = os.path.join(out_dir, "star-fusion.fusion_predictions.abridged.tsv")
+ 
     return Job(
         [in1fastq, in2fastq, config_file if config_file else None],
         [result_file],
-        [
-            ["ericscript", "module_bedtools"],
-            ["ericscript", "module_blat"],
-            ["ericscript", "module_samtools"],
-            ["ericscript", "module_R_3_1_0"],
-            ["ericscript", "module_bwa"],
-            ["ericscript", "module_seqtk"]
-
-        ],
+        [["star_fusion", "module_star_fusion"], ["star_fusion","module_perl"], ["star_fusion", "module_gcc"], ["star_fusion", "module_samtools"]],
         command="""\
-export PATH=$PATH:{ericscript_path} && \\
-ericscript.nodbcheck.pl \\
+STAR-Fusion --CPU 8 \\
   {other_options} \\
-  -db {database_path} \\
-  -name "fusion" \\
-  -o {out_dir} \\
-  {in1fastq} \\
-  {in2fastq} && \\
-rm -rf {out_dir}/aln && rm -rf {out_dir}/out""".format(
-        ericscript_path=ericscript_path,
-        other_options=" \\\n  " + other_options if other_options else "",
-        database_path=database_path,
+  --left_fq {in1fastq} \\
+  --right_fq {in2fastq} \\
+  --genome_lib_dir {CTAT_resource_lib} \\
+  --output_dir {out_dir}""".format(
+        other_options= other_options if other_options else "",
         in1fastq=in1fastq,
         in2fastq=in2fastq,
-        out_dir=out_dir
+        CTAT_resource_lib=CTAT_resource_lib,
+        out_dir= out_dir
         ),
         removable_files=[]
+
     )
+
+#        command="""\
+#STAR-Fusion --CPU 8 \\
+#  {other_options} \\
+#  --left_fq {in1fastq} \\
+#  --right_fq {in2fastq} \\
+#  --genome_lib_dir {CTAT_resource_lib} \\
+#  --output_dir {out_dir} && \\
+#ls -d {out_dir}/*|grep -v result|xargs rm -rf""".format(
+
+#STAR-Fusion --CPU 8 \
+#    --left_fq $left_fastq \
+#    --right_fq $right_fastq \
+#    --genome_lib_dir $CTAT_resource_lib \
+#    --output_dir $output_dir
 

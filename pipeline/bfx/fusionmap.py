@@ -26,7 +26,8 @@ import os
 from core.config import *
 from core.job import *
 
-def fusionmap(in1fastq, in2fastq, out_dir, config_file=None, ini_section='fusionmap'):
+
+def fusionmap(in1fastq, in2fastq, out_dir, top_dir, config_file=None, ini_section='fusionmap'):
 
     other_options = config.param(ini_section, 'other_options', required=False)
     out_prefix = "02_RNA"
@@ -44,6 +45,7 @@ def fusionmap(in1fastq, in2fastq, out_dir, config_file=None, ini_section='fusion
         command="""\
 ln -sf $PWD/{in1fastq} {link1fastq} && \\
 ln -sf $PWD/{in2fastq} {link2fastq} && \\
+cp -R -u -p /hpf/largeprojects/ccmbio/jiangyue/tools/FusionMap/FusionMap_2015-03-31 {top_dir}/ && \\
 echo "\n<Files>\n{link1fastq}\n{link2fastq}\n<Output>\nTempPath={out_dir}/FusionMapTemp\nOutputPath={out_dir}\nOutputName={out_prefix}" \\
   >{out_dir}/tmp.cfg &&
 cat {out_dir}/tmp.cfg \\
@@ -51,7 +53,7 @@ cat {out_dir}/tmp.cfg \\
   >{out_dir}/fusionmap.cfg && \\
 /hpf/tools/centos6/mono/2.10.9/bin/mono \\
   /hpf/tools/centos6/Oshell/20170421/oshell.exe \\
-  --semap /hpf/largeprojects/ccmbio/jiangyue/tools/FusionMap/FusionMap_2015-03-31 \\
+  --semap {top_dir}/FusionMap_2015-03-31 \\
   Human.B37.3 \\
   RefGene \\
   {out_dir}/fusionmap.cfg \\
@@ -62,9 +64,18 @@ cat {out_dir}/tmp.cfg \\
         in2fastq=in2fastq,
         link1fastq=link1fastq,
         link2fastq=link2fastq,
+        top_dir=top_dir,
         out_dir=out_dir,
         out_prefix=out_prefix,
         fastq_path=fastq_path
         ),
         removable_files=[]
     )
+
+
+# NOTES
+
+# fusionmap application directory: /hpf/largeprojects/ccmbio/jiangyue/tools/FusionMap/FusionMap_2015-03-31, 
+# was previously being used as first parameter to --semap flag
+# instead, due to permission issues, a new instance of the FusionMap_2015-03-31 application is being generated in the top-level output directory of the pipeline
+# each time it is run

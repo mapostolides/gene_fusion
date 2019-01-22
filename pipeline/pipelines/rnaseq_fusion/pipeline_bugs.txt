@@ -168,3 +168,48 @@ In the file results.filtered.tsv, which is the raw output of the defuse fusion c
 
 int the file 02_RNA.FusionReport.txt, which is the raw output of the fusionmap fusion caller, there are no columns corresponding to strand information. However, this information should be able to be assigned using the ens_known_genes.bed file 
 
+
+*************
+Oct 18, 2018:
+*************
+
+For the deFuse fusion caller, It is unclear which strand information should be used and assigned to the CffFusion object. Currently, the following is being used:
+genomic_strand1 : genomic strand in gene 1 of fusion splice / breakpoint, retained sequence upstream on this strand, breakpoint is downstream
+genomic_strand2 : genomic strand in gene 2 of fusion splice / breakpoint, retained sequence upstream on this strand, breakpoint is downstream
+
+However, I believe instead, this should be used:
+gene_strand1 : strand of gene 1
+gene_strand2 : strand of gene 2
+
+Source: [https://shahlab.ca/projects/defuse/]
+
+The reason I believe this is because, for the above bug on October 11, 2018, both HES1 and IFNL1 are genes that are on the '+/f' strand, and using the genomic_strand1/genomic_strand2 incorrectly assigns them to the '+' and '-' strands, respectively. This results in incorrect information being contained in the final output file of the pipeline.
+It also seems that both ericscript and integrate are incorrectly assigning genomic strand information. They are being assigned the wrong strand for IFNL1, despite having access to the correct strand information in the reference file (ens_known_genes.bed). 
+-confused about strand assignment in ann_gene_order function in pygeneann.py. It is possible that it is being correctly assigned, but really seems like it isn't.
+
+
+Problem :inconsistent gene naming convenctions by fusion callers. Results in fusions being miscategorized if fusioncallers assign names to genes which are not the "NCBI standard" as per the reference file human_g1k_v37_decoy.fasta. 
+
+Speaking with Teja and Alper has led me to understand that changing the code/reference file in the fusion callers is not a reasonable solution. It is better to create a database of gene names, and generate a new output file with candidate fusions named according to their correct gene names. 
+
+************
+Oct 22, 2018
+************
+
+Goal: to ensure that fusion caller output gene names correspond to gene names in [ens_known_genes.bed] reference file.
+
+Working directory: /Users/mapostolides/mugqic_tools-master/python-tools/fusiontools/0.1.0/bin/reann_cff_fusion_testing/convert_gene_names
+
+Method: Read in initial [merged.cff] file, rename genes approrpiately, and write out a new .cff file with correct gene names.
+ 
+Issues: 
+-when attempting to rename genes names outputted by the fusion callers, the alias2Symbol function of the "limma" R package returns empty string when the queried gene doesn't exist anywhere in the database. For example, RP11-554D15.3 and RP11-146N23.1, which are pseudogenes, return an empty string. Using alias2SymbolTable instead results in NA being returned.
+
+Since such pseudogenes ARE present in the .bed reference file ens_known_genes.bed, could check if a query gene is present in this file first, to avoid the complication of needing to run alias2SymbolTable for these genes. 
+
+-Since the [reann_cff_fusion.py] fusiontool script uses code from [pygeneann.py] to load the entire [ens_known_genes.bed] reference file into a giant nested python object, this can be useful. Specifically, directly adjacent intervals (which correspond to genomic features, and are sub-components of genes) are combined into larger intervals which correspond to entire genes. This interval object is constructed dynamically as the step is running, and can be queried.
+
+************
+Oct 23, 2018
+************
+
