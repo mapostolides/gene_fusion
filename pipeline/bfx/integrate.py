@@ -74,4 +74,31 @@ paste {breakpoints_file} {cov_file} > {result_file}""".format(
         ),
         removable_files=[]
     )
+"""
+Integrate fusion (options) reference.fasta annotation.txt directory_to_bwt accepted_hits.bam unmapped.bam (dna.tumor.bam dna.normal.bam)
 
+options: -cfn      integer : Cutoff of spanning RNA-Seq reads for fusions with non-canonical
+                             exonic boundaries.                                                         default: 3
+         -rt       float   : Normal dna / tumor dna ratio. If the ratio is less than
+                             this value, then dna reads from the normal dna data set 
+                             supporting a fusion candidates are ignored.                                default: 0.0
+         -minIntra integer : If only having RNA reads, a chimera with two adjacent
+                             genes in order is annotated as intra_chromosomal rather than 
+                             read_through if the distance of the two genes is longer than
+                             this value.                                                                default: 400000
+         -minW     float   : Mininum weight for the encompassing rna reads on an edge.                  default: 2.0
+         -mb       integer : See subcommand "mkbwt".
+                             This value can be larger than used by mkbwt.                               default: 10000000
+         -reads    string  : File to store all the reads.                                               default: reads.txt
+         -sum      string  : File to store summary.                                                     default: summary.tsv
+         -ex       string  : File to store exons for fusions with canonical exonic boundaries.          default: exons.tsv
+         -bk       string  : File to store breakpoints                                                  default: breakpoints.tsv
+         -bedpe    string  : File to store breakpoints in bedpe format                                  default: bk_fusion.bedpe
+         -vcf      string  : File to store breakpoints in vcf format                                    default: bk_sv.vcf
+         -bacc     integer : max difference between spanning reads and annotation to decide canonical.  default: 1
+         -largeNum integer : if a gene shows greater or equal to this number, remove it from results.   default: 4
+         -sample   string  : sample name                                                                default: sample
+
+
+
+"""

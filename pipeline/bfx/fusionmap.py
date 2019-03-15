@@ -36,7 +36,10 @@ def fusionmap(in1fastq, in2fastq, out_dir, top_dir, config_file=None, ini_sectio
     fastq_path = os.path.dirname(in2fastq)
     link2fastq = os.path.join(fastq_path, "tmplink_2.fastq")
     result_file = os.path.join(out_dir, "02_RNA.FusionReport.txt")
-
+    top_dir="/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules"
+# The below command can be used to create a new installation of FusionMap in the output directory
+# For now I am trying to just use my local copy of FusionMap and not create a new one each run, as this seems to be creating conflicts
+#cp -R -u -p /hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/FusionMap_2015-03-31 {top_dir}/ && \\
     return Job(
         [in1fastq, in2fastq, config_file if config_file else None],
         [result_file],
@@ -45,7 +48,6 @@ def fusionmap(in1fastq, in2fastq, out_dir, top_dir, config_file=None, ini_sectio
         command="""\
 ln -sf $PWD/{in1fastq} {link1fastq} && \\
 ln -sf $PWD/{in2fastq} {link2fastq} && \\
-cp -R -u -p /hpf/largeprojects/ccmbio/jiangyue/tools/FusionMap/FusionMap_2015-03-31 {top_dir}/ && \\
 echo "\n<Files>\n{link1fastq}\n{link2fastq}\n<Output>\nTempPath={out_dir}/FusionMapTemp\nOutputPath={out_dir}\nOutputName={out_prefix}" \\
   >{out_dir}/tmp.cfg &&
 cat {out_dir}/tmp.cfg \\

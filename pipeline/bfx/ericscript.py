@@ -64,4 +64,16 @@ rm -rf {out_dir}/aln && rm -rf {out_dir}/out""".format(
         ),
         removable_files=[]
     )
+#  --minreads 1 \\
+# -- MAPQ 1
+"""
+This section details possible modificaitons to ericscript parameters, obtained by running: 
+ $ ericscript.nodbcheck.pl --help
+Output of the above command can be found here:
+/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/ericscript-0.5.4/help
 
+-minr, --minreads <int>         minimum reads to consider discordant alignments [3]
+-ntrim <int>                    trim PE reads from 1st base to $ntrim. Default is no trimming. Set ntrim=0 to don't trim reads. 
+--MAPQ <int>                    minimum value of mapping quality to consider discordant reads. For MAPQ 0 use a negative value [20] 
+
+"""

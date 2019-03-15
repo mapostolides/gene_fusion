@@ -48,7 +48,8 @@ from bfx import ericscript
 from bfx import gunzip
 from bfx import merge_fastq
 from bfx import cff_conversion
-#from bfx import fusioninspector
+from bfx import rename_genes 
+from bfx import fusioninspector
 from bfx import check_dna_support_before_next_exon
 from bfx import merge_and_reannotate_cff_fusion
 from bfx import repeat_filter
@@ -654,37 +655,6 @@ pandoc --to=markdown \\
         job_list = [Job(command="mkdir -p " + out_dir)]
         sampleinfo_file = os.path.relpath(self.args.sampleinfo.name, self.output_dir)
         
-#        #remove failed samples from analysis (optional)
-#        remove_failed_samples = 0 
-#        if (remove_failed_samples):
-#            failed_samples = []
-#            for sample in self.samples:
-#                #instantiate fusion caller result file paths
-#                star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
-#                defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
-#                fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")
-#                ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
-#                integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
-#                #check if sample output files have been generated, generate list of failed samples
-#                result_files = [star_fusion_result, defuse_result, fusionmap_result, ericscript_result, integrate_result]
-#                for i in range (0, len(result_files)):
-#                    file_exists = os.path.isfile(result_files[i])
-#                    if not (file_exists):
-#                        failed_samples.append(sample)
-#            #remove duplicates
-#            failed_samples = list(set(failed_samples))
-#            #remove failed samples from self.samples, remove them from analysis         
-#            print >> sys.stderr, "Original number of samples:" + str(len(self.samples))
-#            print >> sys.stderr, [sample.name for sample in self.samples]
-#            for sample in failed_samples:
-#                self.samples.remove(sample) 
-#            print >> sys.stderr,"subset of samples, failed removed:" + str(len(self.samples))
-#            print >> sys.stderr, [sample.name for sample in self.samples]
-#            #write filtered sample list to file for record
-#            #sample_file = open(os.path.join(self.output_dir, "processed_samples.txt"), 'w+')
-#            #sample_file.write(self.samples)
-#            #sample_file.close() 
-                    
         for sample in self.samples:
             star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
             defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
@@ -716,25 +686,81 @@ pandoc --to=markdown \\
         jobs.append(job)
         return jobs
 
-#    def rename_genes(self):
-#
-#    rename_genes.rename_genes(cff_file, out_dir)
-#
-#
-#
-#    def fusioninspector(self):
-#
-#    fusioninspector.make_fusion_list_file(cff_file, out_dir) 
-#
-#    fusioninspector.run_fusioninspector
-#
-#
-#
-#    return jobs
-
-    def merge_and_reannotate_cff_fusion(self):
+    def rename_genes(self):
+        """ 
+        Rename genes to consensus gene names using Limma package "". This allows consistency in merging/categorizing downstream
         """
-        Merge all cff files into one single file and reannotate it with given annotation files
+        jobs = []
+        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        out_dir = os.path.join("fusions", "cff")
+        for sample in self.samples:
+            job_list = []
+            # create separate "rename_genes" job for each sample
+            for tool in tool_list:
+                rename_genes_job = rename_genes.rename_cff_file_genes(sample, tool, out_dir)
+                job_list.append(rename_genes_job)
+            # concat jobs
+            job = concat_jobs(job_list, name= "rename_genes." + sample.name )
+            jobs.append(job)
+        return jobs
+
+
+    def fusioninspector(self):
+        """
+        Create fusion_list files for input to fusioninspector, and run fusioninspector on all samples for all callers separately 
+        """
+        jobs = []
+        cff_dir = os.path.join("fusions", "cff")
+        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        # CREATE FUSION LIST FILES 
+        cff_files = []
+        for sample in self.samples:
+            fusion_list_out_dir = os.path.join("fusions", "fusioninspector", "FI_fusion_list_files", sample.name)
+            job_list = []
+            job_list.append(Job(command="mkdir -p " + fusion_list_out_dir))
+            # create job_list for current sample
+            for tool in tool_list:
+                cff_file = os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed")
+                fusion_list_job = fusioninspector.make_fusion_list(cff_file, tool, fusion_list_out_dir)
+                job_list.append(fusion_list_job)
+            # concat jobs
+            job = concat_jobs(job_list, name= "make_fusion_list." + sample.name )
+            jobs.append(job)
+        # RUN FUSIONINSPECTOR
+        #select input fastq files 
+        for sample in self.samples:
+            fusion_list_out_dir = os.path.join("fusions", "fusioninspector", "FI_fusion_list_files", sample.name)
+            fastq1, fastq2 = self.select_input_fastq(sample)
+            # run fusioninspector for each tool separately
+            for tool in tool_list:
+                out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name, tool )
+                fusion_list_file = os.path.join(fusion_list_out_dir, tool + ".fusion_list.txt")
+                fusioninspector_job = fusioninspector.fusioninspector(fastq1, fastq2, out_dir, fusion_list_file)
+                job = concat_jobs([
+                    Job(command="mkdir -p " + out_dir),
+                    fusioninspector_job
+                ], name="fusioninspector." + sample.name + "." + tool)
+                jobs.append(job)
+        return jobs
+
+    def filter_cff_calls_using_fusioninspector_results(self):
+        jobs = []
+        cff_dir = os.path.join("fusions", "cff")
+        # FILTER CFF FUSIONS USING FUSIONINSPECTOR OUTPUT
+        for sample in self.samples:
+            job_list = []
+            filtered_out_dir = os.path.join("fusions", "cff_filtered", sample.name)
+            job_list.append([Job(command="mkdir -p " + filtered_outdir)])
+            for tool in tool_list:
+                FI_out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name, tool ) 
+                filter_job = fusioninspector.filter_cff_calls_using_FI_results(FI_out_dir, filtered_out_dir, sample, tool, cff_dir)
+                job_list.append(filter_job)
+            job = concat_jobs(job_list, name= "filter_cff." + sample.name )
+        return jobs
+
+    def merge_cff_fusion(self):
+        """
+        Merge all cff files into one single file
         """
         jobs = []
         cff_files = []
@@ -742,18 +768,28 @@ pandoc --to=markdown \\
         out_dir = os.path.join("fusions", "cff")
         tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
         for tool in tool_list:
-            cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff") for sample in self.samples])
+            cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
+        # REMOVE STRAND SIGN COMMAND, this command is executed in ~/bfx/merge_and_reannotate_cff_fusion.py
+        # assigns "NA" to all strand fields, as previously, reann_cff_fusion.py script was miscategorizing gene fusions based on strand information
+        # awk -F '\t' -v OFS='\t' '{$3="NA"; $6="NA"; print}' merged.cff
         merge_job = merge_and_reannotate_cff_fusion.merge_cff_fusion(cff_files, out_dir)
         
-        job = concat_jobs([
-            reann_job    
-        ], name="merge_cff_fusion")
-
+        job = concat_jobs([ merge_job ], name="merge_cff_fusion")
         jobs.append(job)
+        return jobs
+    
+    def reannotate_cff_fusion(self):
+        """
+        Reannotate merged cff file with given annotation files
+        """
+        jobs = []
+        out_dir = os.path.join("fusions", "cff")
 
         merged_cff_file = os.path.join("fusions", "cff", "merged.cff") 
-        reann_job = merge_and_reannotate_cff_fusion.reannotate_cff_fusion(merged_cff_file, out_dir)
-        #TODO implement reannotation step
+        reann_job = merge_and_reannotate_cff_fusion.reannotate_cff_fusion([merged_cff_file], out_dir)
+        job = concat_jobs([reann_job], name="reannotate_cff_fusion")
+        jobs.append(job)
+
         return jobs
     
         
@@ -815,19 +851,21 @@ pandoc --to=markdown \\
     
     def fusion_stats(self):
         """
-        Genereates a file containing statistics about detected fusions.
-        Outputs statistics and plots about the detected gene fusions.
+        Outputs count files and plots about the detected gene fusions.
         """
         jobs = []
-        in_dir = os.path.join("fusions", "cff")
+        cff_dir = os.path.join("fusions", "cff")
         out_dir= os.path.join("fusions", "fusion_stats")
         sampleinfo_file = os.path.relpath(self.args.sampleinfo.name, self.output_dir)
 
-        fusion_stats_job = fusion_stats.fusion_stats(in_dir, out_dir, sampleinfo_file)
-        
+        fusion_stats_job = fusion_stats.fusion_stats(cff_dir, out_dir, sampleinfo_file)
+        category_table_job = fusion_stats.generate_category_count_table(cff_dir, out_dir)
+        category_barplot_job = fusion_stats.generate_categories_barplot(fusion_stats_dir=out_dir)
         job = concat_jobs([
             Job(command="mkdir -p " + out_dir),
-            fusion_stats_job
+            fusion_stats_job,
+            category_table_job,
+            category_barplot_job
         ], name="fusion_stats")
 
         jobs.append(job)
@@ -840,15 +878,16 @@ pandoc --to=markdown \\
         detection of validated fusions which are known to bepresent in the sample.
         Requires --valfile flag, with corresponding file containing gene pairs
         """
-        #output_fusions = os.path.join("fusions", "cff", "merged.cff.reann.dnasupp.bwafilter.30.cluster")
-        in_dir = os.path.join("fusions", "cff")
+        cff_dir = os.path.join("fusions", "cff")
+        cluster_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter.30.cluster")
         out_dir = os.path.join("fusions", "validate_fusions")
         jobs = []
-        
-        validate_fusions_job = validate_fusions.validate_fusions(in_dir, out_dir, self.args.valfile.name)
+        intersect_breakpoints_job = validate_fusions.intersect_breakpoints_with_bedfile(cluster_file, cff_dir)
+        validate_fusions_job = validate_fusions.validate_fusions(cff_dir, out_dir, self.args.valfile.name)
 
         job = concat_jobs([
             Job(command="mkdir -p " + out_dir),
+            intersect_breakpoints_job,
             validate_fusions_job
         ], name="validate_fusions")
 
@@ -888,13 +927,17 @@ pandoc --to=markdown \\
             self.integrate,
             self.integrate_make_result_file,
             self.convert_fusion_results_to_cff,
-            self.merge_and_reannotate_cff_fusion,
+            self.rename_genes,
+            #self.fusioninspector
+            #self.filter_cff_calls_using_fusioninspector_results,
+            self.merge_cff_fusion,
+            self.reannotate_cff_fusion,
             self.check_dna_support_before_next_exon,
             self.repeat_filter,
             self.cluster_reann_dnasupp_file,
             self.fusion_stats,
-            self.validate_fusions,
-            self.delete_fastqs
+            self.validate_fusions
+            #self.delete_fastqs
         ]
 
 if __name__ == '__main__':

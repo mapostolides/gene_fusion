@@ -57,6 +57,54 @@ category_fusion_stats.py \\
         removable_files=[]
     )
 
+
+def generate_category_count_table(cff_dir, out_dir, ini_section='fusion_stats' ):
+    """
+    Generates a tsv file with the gene fusion category counts, per category, per caller
+    """
+    cluster_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter.30.cluster")
+
+    return Job(
+        [cluster_file],
+        [os.path.join(out_dir, "category_count_file.txt")],
+        [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
+        command="""\
+generate_category_table.py \\
+  {cluster_file} \\
+  {out_dir}""".format(
+        cluster_file=cluster_file,
+        out_dir=out_dir,
+        ),
+        removable_files=[]
+    )
+
+def generate_categories_barplot(fusion_stats_dir, ini_section='fusion_stats'):
+    """
+    Creates a barplot out of the "category_count_file.txt" file
+    """
+    category_count_file =  os.path.join(fusion_stats_dir, "category_count_file.txt")
+    barplot_file = os.path.join(fusion_stats_dir, 'barplot_fusion_categories.html')
+    
+#generate_categories_barplot.py  $category_count_file $path 
+    return Job(
+        [category_count_file],
+        [barplot_file],
+        [["fusion_stats", "module_python_plotly"],["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
+        command="""\
+generate_categories_barplot.py \\
+  {category_count_file} \\
+  {output_dir}""".format(
+        category_count_file=category_count_file,
+        output_dir=fusion_stats_dir,
+        ),
+        removable_files=[]
+    )
+
+
+
+
+#SCRAP/NOTES
+
 # category_fusion_stats.py testfiles/merged.cff.reann.dnasupp.bwafilter.30.cluster testfiles/sampleinfo
 
 # cluster type, head gene, tail gene, max split read cnt, max spanning read cnt,  sample type, disease
