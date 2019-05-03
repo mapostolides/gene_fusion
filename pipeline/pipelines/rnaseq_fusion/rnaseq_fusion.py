@@ -662,7 +662,8 @@ pandoc --to=markdown \\
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
-            tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            #tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            tool_results = [("star_fusion", star_fusion_result)]
             #determine sample_type
             """
             sample_type = ""
@@ -766,12 +767,14 @@ pandoc --to=markdown \\
         cff_files = []
         cff_dir = os.path.join("fusions", "cff")
         out_dir = os.path.join("fusions", "cff")
-        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        # put defuse .cff file last, which means inverted defuse calls will be always be "fusion2" in "generate_common_fusion_stats_by_breakpoints" function of pygeneann.py. This makes sense, since defuse is only one to make "flipped/inverted" calls. If defuse is not "fusion2" this results in errors in the case where defuse makes a flipped call
+        tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
         for tool in tool_list:
             cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
         # REMOVE STRAND SIGN COMMAND, this command is executed in ~/bfx/merge_and_reannotate_cff_fusion.py
         # assigns "NA" to all strand fields, as previously, reann_cff_fusion.py script was miscategorizing gene fusions based on strand information
         # awk -F '\t' -v OFS='\t' '{$3="NA"; $6="NA"; print}' merged.cff
+        # UPDATE: pygeneann.py has been changed to ignore called strand sign information, and to ONLY fill it in using annotation file
         merge_job = merge_and_reannotate_cff_fusion.merge_cff_fusion(cff_files, out_dir)
         
         job = concat_jobs([ merge_job ], name="merge_cff_fusion")

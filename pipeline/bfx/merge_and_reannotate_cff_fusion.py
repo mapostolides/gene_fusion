@@ -60,7 +60,7 @@ def reannotate_cff_fusion(input_cff_files, out_dir, annotation_file=None, refere
         [merged_cff+".reann"],
         [["reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
-reann_cff_fusion.py \\
+reann_cff_fusion-TEST_desktop_sandbox.py \\
   {merged_cff} \\
   {annotation_file} \\
   {reference_file} \\

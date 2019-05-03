@@ -56,7 +56,7 @@ from bfx import tophat2
 from bfx import integrate
 from bfx import ericscript
 from bfx import gunzip
-from bfx import cff_convertion
+from bfx import cff_conversion
 from bfx import merge_and_reannotate_cff_fusion
 from bfx import samtools_1_1
 from bfx import filter_caputred_reads
@@ -81,7 +81,7 @@ class FusionReadsCapture(common.Illumina):
 		self.argparser.add_argument("--cff", help="cff file", type=file)
 		self.argparser.add_argument("--sampleinfo", help="sample info file", type=file)
 
-		super(FusionCapture, self).__init__()
+		super(FusionReadsCapture, self).__init__()
 
 
 ## fusion reads capture pipeline
