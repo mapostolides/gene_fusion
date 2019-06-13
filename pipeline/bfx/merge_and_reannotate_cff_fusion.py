@@ -30,21 +30,16 @@ def merge_cff_fusion(input_cff_files, out_dir, annotation_file=None, reference_f
 
     other_options = config.param(ini_section, 'other_options', required=False)
     merged_cff = os.path.join(out_dir, "merged.cff")
-    # removes strand sign information, replaces with NA
-    awk_contents="""{$3="NA"; $6="NA"; print}"""  
 
     return Job(
         input_cff_files,
         [merged_cff],
         [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
-cat {cff_files} > {out_dir}/merged.cff-temp;\\
-awk -F '\t' -v OFS='\t' '{awk_contents}' {out_dir}/merged.cff-temp > {out_dir}/merged.cff;\\
-rm {out_dir}/merged.cff-temp\\
+cat {cff_files} > {out_dir}/merged.cff\\
   """.format(
         cff_files=" \\\n".join(input_cff_files),
-        out_dir=out_dir,
-        awk_contents=awk_contents
+        out_dir=out_dir
         ),
         removable_files=[]
     )
@@ -60,7 +55,7 @@ def reannotate_cff_fusion(input_cff_files, out_dir, annotation_file=None, refere
         [merged_cff+".reann"],
         [["reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
-reann_cff_fusion-TEST_desktop_sandbox.py \\
+reann_cff_fusion.py \\
   {merged_cff} \\
   {annotation_file} \\
   {reference_file} \\

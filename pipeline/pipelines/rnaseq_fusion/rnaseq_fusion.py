@@ -662,8 +662,9 @@ pandoc --to=markdown \\
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
-            #tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
-            tool_results = [("star_fusion", star_fusion_result)]
+            tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+#            tool_results = [("star_fusion", star_fusion_result)]
+            #tool_results = [("integrate", integrate_result)]
             #determine sample_type
             """
             sample_type = ""
@@ -689,7 +690,7 @@ pandoc --to=markdown \\
 
     def rename_genes(self):
         """ 
-        Rename genes to consensus gene names using Limma package "". This allows consistency in merging/categorizing downstream
+        Rename genes to consensus gene names using R Limma package . This allows consistency in merging/categorizing downstream
         """
         jobs = []
         tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
@@ -771,10 +772,6 @@ pandoc --to=markdown \\
         tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
         for tool in tool_list:
             cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
-        # REMOVE STRAND SIGN COMMAND, this command is executed in ~/bfx/merge_and_reannotate_cff_fusion.py
-        # assigns "NA" to all strand fields, as previously, reann_cff_fusion.py script was miscategorizing gene fusions based on strand information
-        # awk -F '\t' -v OFS='\t' '{$3="NA"; $6="NA"; print}' merged.cff
-        # UPDATE: pygeneann.py has been changed to ignore called strand sign information, and to ONLY fill it in using annotation file
         merge_job = merge_and_reannotate_cff_fusion.merge_cff_fusion(cff_files, out_dir)
         
         job = concat_jobs([ merge_job ], name="merge_cff_fusion")
