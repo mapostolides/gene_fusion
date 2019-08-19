@@ -27,7 +27,6 @@
 from core.config import *
 from core.job import *
 
-
 def view(input, output=None):
     return Job(
         [input],
@@ -43,4 +42,3 @@ export REF_PATH=/hpf/largeprojects/ccmbio/jiangyue/DIPG_analysis_by_samples/Anal
         ),
         removable_files=[output]
     )
-

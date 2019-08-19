@@ -73,7 +73,13 @@ from bfx import rmarkdown
 from pipelines import common
 import utils
 
-
+# READS CAPTURE IMPORTS
+from bfx import filter_caputred_reads_DEV as filter_caputred_reads
+from bfx import fusion_reads_capture_results_sum_DEV as fusion_reads_capture_results_sum
+from bfx import build_fusion_and_head_gene_ref_DEV as build_fusion_and_head_gene_ref
+from bfx import bwa_fusion_reads_capture_DEV as bwa_fusion_reads_capture
+from bfx import extract_captured_reads_and_realn
+from bfx import valfilter
 
 log = logging.getLogger(__name__)
 
@@ -656,13 +662,14 @@ pandoc --to=markdown \\
         sampleinfo_file = os.path.relpath(self.args.sampleinfo.name, self.output_dir)
         
         for sample in self.samples:
-            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
+#            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
             defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
             fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
-            tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            #tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            tool_results = [("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
 #            tool_results = [("star_fusion", star_fusion_result)]
             #tool_results = [("integrate", integrate_result)]
             #determine sample_type
@@ -693,7 +700,8 @@ pandoc --to=markdown \\
         Rename genes to consensus gene names using R Limma package . This allows consistency in merging/categorizing downstream
         """
         jobs = []
-        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        #tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        tool_list = ["defuse", "fusionmap", "ericscript", "integrate"]
         out_dir = os.path.join("fusions", "cff")
         for sample in self.samples:
             job_list = []
@@ -769,7 +777,8 @@ pandoc --to=markdown \\
         cff_dir = os.path.join("fusions", "cff")
         out_dir = os.path.join("fusions", "cff")
         # put defuse .cff file last, which means inverted defuse calls will be always be "fusion2" in "generate_common_fusion_stats_by_breakpoints" function of pygeneann.py. This makes sense, since defuse is only one to make "flipped/inverted" calls. If defuse is not "fusion2" this results in errors in the case where defuse makes a flipped call
-        tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
+        #tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
+        tool_list = ["fusionmap", "ericscript", "integrate", "defuse"]
         for tool in tool_list:
             cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
         merge_job = merge_and_reannotate_cff_fusion.merge_cff_fusion(cff_files, out_dir)
@@ -826,6 +835,193 @@ pandoc --to=markdown \\
 
         jobs.append(job)
         return jobs
+
+##START fusion reads capture pipeline
+    def build_fusion_and_head_gene_ref(self):
+        """
+        Build fusion reference together with the head gene's all transcripts sequences
+        """
+
+        jobs = []
+        cff_dir = os.path.join("fusions", "cff")
+        cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter.30")
+        out_dir = os.path.join("fusion_reads_capture", "fusion_refs")
+
+        build_job = build_fusion_and_head_gene_ref.build_fusion_and_head_gene_ref(cff_file, out_dir)
+        job = concat_jobs([
+            Job(command="mkdir -p " + out_dir),
+            build_job
+        ], name="build_fusion_and_head_gene_ref")
+
+        jobs.append(job)
+        return jobs
+
+    def fastq_conversion_and_reads_capture(self):
+        """
+        Coert cram2.0 file to fastq file with samtools1.1 and picard
+        """
+        jobs = []
+        # make .cff file of repeat_filter step input to this step
+        seq_len = config.param('repeat_filter', 'seq_len', type='int')
+        cff_dir = os.path.join("fusions", "cff")
+        cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+        #TODO make sure cram file works
+        #cram_file = self.args.cff.name
+        #out_dir = os.path.join("fusion_reads_capture", "cram_fastq")
+        for readset in self.readsets:
+            out_dir = os.path.join("fusion_reads_capture", "captured_bam", readset.sample.name)
+            if not readset.fastq1:
+                if readset.bam:
+                    # convert bam to fastq, fastq saved on localhd
+                    fastq1 = os.path.join("$TMPDIR", os.path.basename(readset.bam) + ".1.fastq")
+                    fastq2 = os.path.join("$TMPDIR", os.path.basename(readset.bam) + ".2.fastq")
+                    bam2fastq_job = picard.sam_to_fastq(readset.bam, fastq1, fastq2)
+                    # bwa aln fastqs to capture reference
+                    out_bam = os.path.join(out_dir, "captured.bam")
+                    ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
+                    capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
+
+                    job = concat_jobs([
+                        Job(command="mkdir -p " + out_dir),
+                        bam2fastq_job,
+                        capture_job
+                    ], name="fastq_conversion_and_reads_capture."+readset.sample.name)
+                    #], name="fastq_conversion_and_reads_capture" )
+                                        # manually set I/O for job
+                    job._input_files = [readset.bam]
+                    job._output_files = [out_bam]
+                    jobs.append(job)
+
+                elif readset.cram:
+                    # convert cram to bam then to fastq, fastq and bam are saved on localhd
+                    out_bam = os.path.join("$TMPDIR", os.path.basename(readset.cram)+".bam")
+                    fastq1 = out_bam + ".1.fastq"
+                    fastq2 = out_bam + ".2.fastq"
+                    #cram2bam_job = samtools_1_1.view(readset.cram, out_bam, "convert_cram_to_fastq")
+                    cram2bam_job = samtools_1_1.view(readset.cram, out_bam)
+                    bam2fastq_job = picard.sam_to_fastq(out_bam, fastq1, fastq2)
+
+                    # bwa aln fastqs to capture reference
+                    out_bam = os.path.join(out_dir, "captured.bam")                                                          
+                    ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
+                    capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
+
+                    job = concat_jobs([
+                        Job(command="mkdir -p " + out_dir),
+                        cram2bam_job,
+                        bam2fastq_job,
+                        capture_job
+                    ], name="fastq_conversion_and_reads_capture")
+                    #], name="fastq_conversion_and_reads_capture"+readset.sample.name)
+                                        # manually set I/O for job
+                    job._input_files = [readset.cram]
+                    job._output_files = [out_bam]
+
+                    jobs.append(job)
+                else:
+                    raise Exception("Error: CRAM file not available for readset \"" + readset.name + "\"!")
+            else:
+                fastq1 = readset.fastq1
+                fastq2 = readset.fastq2
+
+                # bwa aln fastqs to capture reference
+                out_bam = os.path.join(out_dir, "captured.bam")
+                ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
+                capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
+
+                job = concat_jobs([
+                    Job(command="mkdir -p " + out_dir),
+                    capture_job
+                ], name="bwa_fusion_reads_capture."+readset.sample.name)
+
+                jobs.append(job)
+
+        return jobs
+
+    def extract_captured_reads_and_realn(self):
+        """
+        BWA mem realign captured reads to hg + transcript junction references
+        """
+
+        jobs = []
+        for readset in self.readsets:
+
+            captured_bam = os.path.join("fusion_reads_capture", "captured_bam", readset.sample.name, "captured.bam")
+            out_dir = os.path.join("fusion_reads_capture", "realigned_bam", readset.sample.name)
+            out_bam = os.path.join(out_dir, "realigned.bam")
+
+            realign_job = extract_captured_reads_and_realn.extract_captured_reads_and_realn(captured_bam, out_bam, ini_section='extract_captured_reads_and_realn')
+
+            job = concat_jobs([
+                Job(command="mkdir -p " + out_dir),
+                realign_job
+            ], name="extract_captured_reads_and_realn."+readset.sample.name)
+            jobs.append(job)
+        return jobs
+
+    def filter_caputred_reads(self):
+        """
+        Compare capture alignment and realignment, print filtered fusion reads alignment and count summary                   
+        """
+
+        jobs = []
+        for readset in self.readsets:
+            sample_info_file = os.path.abspath(self.args.sampleinfo.name)                                                    
+
+            out_dir = os.path.join("fusion_reads_capture", "filtered_result", readset.sample.name)
+            captured_bam = os.path.join("fusion_reads_capture", "captured_bam", readset.sample.name, "captured.bam")
+            realigned_bam = os.path.join("fusion_reads_capture", "realigned_bam", readset.sample.name, "realigned.bam")
+            if readset.cram:
+                filter_job = filter_caputred_reads.filter_caputred_reads(captured_bam, realigned_bam, os.path.basename(readset.cram), sample_info_file, out_dir, ini_section='filter_caputred_reads')
+            elif readset.fastq1 or readset.bam:
+                filter_job = filter_caputred_reads.filter_caputred_reads(captured_bam, realigned_bam, readset.sample.name, sample_info_file, out_dir, ini_section='filter_caputred_reads')
+            job = concat_jobs([
+                Job(command="mkdir -p " + out_dir),
+                filter_job
+            ], name="filter_caputred_reads."+readset.sample.name)
+            jobs.append(job)
+        return jobs
+
+    def merge_and_summary(self):
+        """
+        Merge the results, extract summaries and get the statistics                                                          
+        """
+
+        jobs = []
+        out_dir = os.path.join("fusion_reads_capture", "merged_summary_stats")
+        sum_files = [os.path.join("fusion_reads_capture", "filtered_result", sample.name, "aln_and_summary") for sample in self.samples]
+        sum_job = fusion_reads_capture_results_sum.merge_and_summary(sum_files, out_dir)
+        job = concat_jobs([
+            Job(command="mkdir -p " + out_dir),
+            sum_job
+        ], name="merge_and_summary")
+
+        jobs.append(job)
+        return jobs
+
+    def valfilter_cff_and_sample_enrichment(self):
+        """
+        Filter .cff file using valfilterX, where X is number of captured split reads, 
+        and is specified as command line argument to pipeline. 
+        Perform sample enrichment: Add cff entries for fusions found in additional samples 
+        beyond the first sample in which the fusion was called 
+        """
+        jobs = []
+        num_captured_reads = config.param('valfilter_cff_and_sample_enrichment', 'num_captured_reads', type='int') 
+        merged_summary_dir = os.path.join("fusion_reads_capture", "merged_summary_stats")
+        sum_file = os.path.join(merged_summary_dir , "merged.summary")
+        #1) filter merged.summary file on num_captured_reads
+        filter_merged_summary_job = valfilter.filter_merged_summary_file(sum_file, num_captured_reads)
+        jobs.append(filter_merged_summary_job)
+        #2) filter .cff and sample enrichment
+        seq_len = config.param('repeat_filter', 'seq_len', type='int')
+        cff_file = os.path.join("fusions", "cff", "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+        filtered_sum_file = os.path.join(merged_summary_dir, "merged." + str(num_captured_reads) +  ".summary")
+        filter_cff_sample_enrichment_job = valfilter.filter_cff_and_sample_enrichment(filtered_sum_file, cff_file)
+        jobs.append(filter_cff_sample_enrichment_job)
+        return jobs
+
+##END fusion reads capture pipeline
 
     def cluster_reann_dnasupp_file(self):
         """
@@ -934,6 +1130,14 @@ pandoc --to=markdown \\
             self.reannotate_cff_fusion,
             self.check_dna_support_before_next_exon,
             self.repeat_filter,
+            # VALIDATION PIPELINE
+            self.build_fusion_and_head_gene_ref,
+            self.fastq_conversion_and_reads_capture,
+            self.extract_captured_reads_and_realn,
+            self.filter_caputred_reads,
+            self.merge_and_summary,
+            self.valfilter_cff_and_sample_enrichment,
+            # MERGE .cff ENTRIES
             self.cluster_reann_dnasupp_file,
             self.fusion_stats,
             self.validate_fusions

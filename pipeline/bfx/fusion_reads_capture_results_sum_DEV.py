@@ -32,7 +32,7 @@ def merge_and_summary(sum_files, out_dir, ini_section='merge_and_summary'):
 	other_options = config.param(ini_section, 'other_options', required=False)
 	return Job(
 		sum_files,
-		[os.path.join(out_dir, "merged.summary.stat")],
+		[os.path.join(out_dir, "merged.summary.stat"), os.path.join(out_dir, "merged.summary")],
 		[["fusion_reads_capture_results_sum", "module_fusiontools"]],
 		command="""\
 cat {sum_files} |grep ^SUM> {out_dir}/merged.summary &&

@@ -156,37 +156,37 @@ class FusionReadsCapture(common.Illumina):
 		jobs.append(job)
 		return jobs
 		
-	def bwa_fusion_reads_capture(self):
-		"""
-		BWA mem aln reads to fusion references
-		"""
-		
-		jobs = []
-		
-
-		for readset in self.readsets:
-			input_dir = os.path.join("fusions", "gunzip_fastq", readset.sample.name)
-			if readset.fastq1 and readset.fastq2:
-				fastq1 = os.path.join(input_dir, os.path.basename(os.path.splitext(readset.fastq1)[0]))
-				fastq2 = os.path.join(input_dir, os.path.basename(os.path.splitext(readset.fastq2)[0]))
-			elif readset.cram:			
-				fastq_dir = os.path.join("fusion_reads_capture", "cram_fastq")
-				cram_name = os.path.basename(readset.cram)
-				fastq1 = os.path.join(fastq_dir, cram_name + ".bam.1.fastq")
-				fastq2 = os.path.join(fastq_dir, cram_name + ".bam.2.fastq")
-
-			cff_file = self.args.cff.name
-			out_dir = os.path.join("fusion_reads_capture", "captured_bam", readset.sample.name)
-			out_bam = os.path.join(out_dir, "captured.bam")
-			ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
-			capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
-		
-			job = concat_jobs([
-				Job(command="mkdir -p " + out_dir),
-				capture_job,
-			], name="bwa_fusion_reads_capture."+readset.sample.name)
-			jobs.append(job)
-		return jobs
+#	def bwa_fusion_reads_capture(self):
+#		"""
+#		BWA mem aln reads to fusion references
+#		"""
+#		
+#		jobs = []
+#		
+#
+#		for readset in self.readsets:
+#			input_dir = os.path.join("fusions", "gunzip_fastq", readset.sample.name)
+#			if readset.fastq1 and readset.fastq2:
+#				fastq1 = os.path.join(input_dir, os.path.basename(os.path.splitext(readset.fastq1)[0]))
+#				fastq2 = os.path.join(input_dir, os.path.basename(os.path.splitext(readset.fastq2)[0]))
+#			elif readset.cram:			
+#				fastq_dir = os.path.join("fusion_reads_capture", "cram_fastq")
+#				cram_name = os.path.basename(readset.cram)
+#				fastq1 = os.path.join(fastq_dir, cram_name + ".bam.1.fastq")
+#				fastq2 = os.path.join(fastq_dir, cram_name + ".bam.2.fastq")
+#
+#			cff_file = self.args.cff.name
+#			out_dir = os.path.join("fusion_reads_capture", "captured_bam", readset.sample.name)
+#			out_bam = os.path.join(out_dir, "captured.bam")
+#			ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
+#			capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
+#		
+#			job = concat_jobs([
+#				Job(command="mkdir -p " + out_dir),
+#				capture_job,
+#			], name="bwa_fusion_reads_capture."+readset.sample.name)
+#			jobs.append(job)
+#		return jobs
 	
 	def extract_captured_reads_and_realn(self):
 		"""
