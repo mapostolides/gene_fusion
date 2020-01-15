@@ -780,7 +780,8 @@ pandoc --to=markdown \\
         #tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
         tool_list = ["fusionmap", "ericscript", "integrate", "defuse"]
         for tool in tool_list:
-            cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
+            #cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
+            cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff") for sample in self.samples])
         merge_job = merge_and_reannotate_cff_fusion.merge_cff_fusion(cff_files, out_dir)
         
         job = concat_jobs([ merge_job ], name="merge_cff_fusion")
@@ -865,6 +866,7 @@ pandoc --to=markdown \\
         seq_len = config.param('repeat_filter', 'seq_len', type='int')
         cff_dir = os.path.join("fusions", "cff")
         cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+        ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
         #TODO make sure cram file works
         #cram_file = self.args.cff.name
         #out_dir = os.path.join("fusion_reads_capture", "cram_fastq")
@@ -878,7 +880,6 @@ pandoc --to=markdown \\
                     bam2fastq_job = picard.sam_to_fastq(readset.bam, fastq1, fastq2)
                     # bwa aln fastqs to capture reference
                     out_bam = os.path.join(out_dir, "captured.bam")
-                    ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
                     capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
 
                     job = concat_jobs([
@@ -888,7 +889,7 @@ pandoc --to=markdown \\
                     ], name="fastq_conversion_and_reads_capture."+readset.sample.name)
                     #], name="fastq_conversion_and_reads_capture" )
                                         # manually set I/O for job
-                    job._input_files = [readset.bam]
+                    job._input_files = [readset.bam, ref]
                     job._output_files = [out_bam]
                     jobs.append(job)
 
@@ -903,7 +904,6 @@ pandoc --to=markdown \\
 
                     # bwa aln fastqs to capture reference
                     out_bam = os.path.join(out_dir, "captured.bam")                                                          
-                    ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
                     capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
 
                     job = concat_jobs([
@@ -911,10 +911,10 @@ pandoc --to=markdown \\
                         cram2bam_job,
                         bam2fastq_job,
                         capture_job
-                    ], name="fastq_conversion_and_reads_capture")
+                    ], name="fastq_conversion_and_reads_capture +readset.sample.name")
                     #], name="fastq_conversion_and_reads_capture"+readset.sample.name)
                                         # manually set I/O for job
-                    job._input_files = [readset.cram]
+                    job._input_files = [readset.cram, ref]
                     job._output_files = [out_bam]
 
                     jobs.append(job)
@@ -926,7 +926,6 @@ pandoc --to=markdown \\
 
                 # bwa aln fastqs to capture reference
                 out_bam = os.path.join(out_dir, "captured.bam")
-                ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
                 capture_job = bwa_fusion_reads_capture.bwa_fusion_reads_capture(fastq1, fastq2, ref, out_bam, read_group=None, ini_section='bwa_fusion_reads_capture')
 
                 job = concat_jobs([
@@ -1044,7 +1043,17 @@ pandoc --to=markdown \\
         jobs.append(job)
         return jobs
 
-    
+    def covfilter(self):
+        """
+        Filters .cluster file based on split and spanning reads
+        """
+        jobs = []
+        out_dir = os.path.join("fusions", "cff")
+
+        covfilter_job = fusion_stats.covfilter(out_dir)
+        jobs.append(covfilter_job)
+        return jobs
+  
     def fusion_stats(self):
         """
         Outputs count files and plots about the detected gene fusions.
@@ -1123,7 +1132,7 @@ pandoc --to=markdown \\
             self.integrate,
             self.integrate_make_result_file,
             self.convert_fusion_results_to_cff,
-            self.rename_genes,
+            #self.rename_genes,
             #self.fusioninspector
             #self.filter_cff_calls_using_fusioninspector_results,
             self.merge_cff_fusion,
@@ -1139,6 +1148,7 @@ pandoc --to=markdown \\
             self.valfilter_cff_and_sample_enrichment,
             # MERGE .cff ENTRIES
             self.cluster_reann_dnasupp_file,
+            self.covfilter,
             self.fusion_stats,
             self.validate_fusions
             #self.delete_fastqs
