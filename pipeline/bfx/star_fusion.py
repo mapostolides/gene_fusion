@@ -42,7 +42,7 @@ STAR-Fusion --CPU 8 \\
   --left_fq {in1fastq} \\
   --right_fq {in2fastq} \\
   --genome_lib_dir {CTAT_resource_lib} \\
-  --output_dir {out_dir}""".format(
+  --output_dir {out_dir} && ls -d {out_dir}/*|grep -v predictions | xargs rm -rf """.format(
         other_options= other_options if other_options else "",
         in1fastq=in1fastq,
         in2fastq=in2fastq,
