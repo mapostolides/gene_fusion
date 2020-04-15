@@ -36,15 +36,15 @@ def defuse(in1fastq, in2fastq, out_dir, config_file=None, ini_section='defuse'):
         [result_file],
         [["defuse", "module_defuse"]],
         command="""\
-/hpf/tools/centos6/defuse/0.6.2/scripts/defuse.pl \\
+OS_VERSION=$(cat /etc/centos-release) && if [[ $OS_VERSION == *"7"* ]]; then DEFUSE_CONFIG=/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/pipeline/config_reference_files/defuse_config-CENTOS7.txt; else DEFUSE_CONFIG=/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/pipeline/config_reference_files/defuse_config.txt; fi &&\\
+defuse.pl \\
   {other_options} \\
-  -c {config_file} \\
+  -c $DEFUSE_CONFIG\\
   {in1fastq} \\
   {in2fastq} \\
   -o {out_dir} && \\
 ls -d {out_dir}/*|grep -v result|xargs rm -rf""".format(
         other_options= other_options if other_options else "",
-        config_file= config_file if config_file else config.param(ini_section, 'defuse_config', required=True),
         in1fastq="  -1 " + in1fastq,
         in2fastq="  -2 " + in2fastq,
         out_dir= out_dir
@@ -52,3 +52,4 @@ ls -d {out_dir}/*|grep -v result|xargs rm -rf""".format(
         removable_files=[out_dir + "/reads.fqi", out_dir + "/reads.names", out_dir + "/reads.?.fastq"]
 
     )
+#config_file= config_file if config_file else config.param(ini_section, 'defuse_config', required=True),

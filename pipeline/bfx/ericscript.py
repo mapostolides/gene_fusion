@@ -31,8 +31,8 @@ def ericscript(in1fastq, in2fastq, out_dir, config_file=None, ini_section='erics
     other_options = config.param(ini_section, 'other_options', required=False)
     result_file = os.path.join(out_dir, "fusion.results.filtered.tsv")
     ericscript_path = "/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/ericscript-0.5.4/"
-    #database_path = "/hpf/largeprojects/ccmbio/jiangyue/database/ericscript/ericscript_db_homosapiens_ensembl73"
-    database_path = "/hpf/largeprojects/ccmbio/mapostolides/database/ericscript_db_homosapiens_ensembl73"
+    database_path = "/hpf/largeprojects/ccmbio/jiangyue/database/ericscript/ericscript_db_homosapiens_ensembl73"
+    #database_path = "/hpf/largeprojects/ccmbio/mapostolides/database/ericscript_db_homosapiens_ensembl73"
     return Job(
         [in1fastq, in2fastq, config_file if config_file else None],
         [result_file],

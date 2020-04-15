@@ -39,6 +39,8 @@ from bfx.design import *
 from bfx.readset import *
 
 from bfx import samtools_1_1
+from bfx import star_seqr 
+from bfx import arriba
 from bfx import star_fusion
 from bfx import defuse
 from bfx import fusionmap
@@ -508,6 +510,142 @@ pandoc --to=markdown \\
         print >> sys.stderr, fastq2
         return fastq1, fastq2
 
+    def run_arriba(self):
+        """
+        """
+    
+        jobs = []
+
+        left_fastqs = defaultdict(list)
+        right_fastqs = defaultdict(list)
+    
+        for readset in self.readsets:
+            trim_dir = os.path.abspath("trim")
+            trim_file_prefix = os.path.join(trim_dir, readset.sample.name,readset.name + "-trimmed-")
+    
+            if readset.run_type == "PAIRED_END":
+                candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
+                if readset.fastq1 and readset.fastq2:
+                    candidate_input_files.append([readset.fastq1, readset.fastq2])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam),
+                                                  re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
+                [fastq1, fastq2] = self.select_input_files(candidate_input_files)
+            elif readset.run_type == "SINGLE_END":
+                candidate_input_files = [[trim_file_prefix + "single.fastq.gz"]]
+                if readset.fastq1:
+                    candidate_input_files.append([readset.fastq1])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".single.fastq.gz", readset.bam)])
+                [fastq1] = self.select_input_files(candidate_input_files)
+                fastq2 = None
+    
+            else:
+                raise Exception("Error: run type \"" + readset.run_type +
+                                "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END or SINGLE_END)!")
+
+            left_fastqs[readset.sample.name].append(fastq1)
+            right_fastqs[readset.sample.name].append(fastq2)
+            
+        for sample in self.samples:
+            output_dir = os.path.join("fusions", "arriba", sample.name)
+        
+            mkdir_job = Job(command="mkdir -p " + output_dir)
+        
+            chgdir_job = Job(command="cd " + output_dir)
+
+            back_to_outdir_job = Job(command="cd " + self._output_dir)
+        
+            job = concat_jobs([
+                mkdir_job,
+                chgdir_job,
+                arriba.run(left_fastqs[sample.name], right_fastqs[sample.name], output_dir),
+                back_to_outdir_job
+            ], name="run_arriba." + sample.name)
+            job.samples = [sample]
+            jobs.append(job)
+    
+        return jobs
+
+    def run_star_seqr(self):
+        """
+        RNA Fusion Detection and Quantification using STAR
+        https://github.com/ExpressionAnalysis/STAR-SEQR
+        """
+
+        jobs = []
+        left_fastqs = defaultdict(list)
+        right_fastqs = defaultdict(list)
+
+        for readset in self.readsets:
+            trim_file_prefix = os.path.join("trim", readset.sample.name, readset.name + "-trimmed-")
+    
+            if readset.run_type == "PAIRED_END":
+                candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
+                if readset.fastq1 and readset.fastq2:
+                    candidate_input_files.append([readset.fastq1, readset.fastq2])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam),
+                                                  re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
+                [fastq1, fastq2] = self.select_input_files(candidate_input_files)
+            elif readset.run_type == "SINGLE_END":
+                candidate_input_files = [[trim_file_prefix + "single.fastq.gz"]]
+                if readset.fastq1:
+                    candidate_input_files.append([readset.fastq1])
+                if readset.bam:
+                    candidate_input_files.append([re.sub("\.bam$", ".single.fastq.gz", readset.bam)])
+                [fastq1] = self.select_input_files(candidate_input_files)
+                fastq2 = None
+    
+            else:
+                raise Exception("Error: run type \"" + readset.run_type +
+                                "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END or SINGLE_END)!")
+
+            left_fastqs[readset.sample.name].append(fastq1)
+            right_fastqs[readset.sample.name].append(fastq2)
+
+
+        for sample in self.samples:
+            output_dir = os.path.join("fusions", "star_seqr", sample.name)
+            
+            star_seqr_dir = os.path.join(output_dir, "temp_fastq")
+            
+            mkdir_job = Job(command="mkdir -p " + star_seqr_dir)
+            
+            temp_left_fastq = os.path.join("trim", sample.name, sample.name + ".pair1.fastq.gz")
+            temp_right_fastq = os.path.join("trim", sample.name, sample.name + ".pair2.fastq.gz")
+    
+            if len(left_fastqs[sample.name]) > 1:
+    
+                jobs.append(concat_jobs([
+                    mkdir_job,
+                    Job(left_fastqs[sample.name], [temp_left_fastq],
+                        command="zcat " + " " + " ".join(left_fastqs[sample.name]) + " | gzip -cf > " + temp_left_fastq,
+                        removable_files=[temp_left_fastq]),
+                    Job(right_fastqs[sample.name], [temp_right_fastq],
+                        command="zcat " + " " + " ".join(right_fastqs[sample.name]) + " | gzip -cf > " + temp_right_fastq,
+                        removable_files=[temp_right_fastq]),
+                ], name="concat_readset." + sample.name))
+                
+                
+                jobs.append(concat_jobs([
+                    mkdir_job,
+                    star_seqr.run(temp_left_fastq, temp_right_fastq, output_dir)
+                ], name="run_star_seqr." + sample.name))
+                
+            else:
+                job = concat_jobs([
+                    mkdir_job,
+                    star_seqr.run(left_fastqs[sample.name], right_fastqs[sample.name], output_dir)
+                ], name="run_star_seqr." + sample.name)
+        
+                job.samples = [sample]
+                jobs.append(job)
+
+        return jobs
+
+
+
     def star_fusion(self):
         """
         Run STAR-Fusion to call gene fusions
@@ -662,16 +800,16 @@ pandoc --to=markdown \\
         sampleinfo_file = os.path.relpath(self.args.sampleinfo.name, self.output_dir)
         
         for sample in self.samples:
-#            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
+            #star_seqr_result = os.path.join("fusions", "star_seqr", sample.name, "??")
+            arriba_result = os.path.join("fusions", "arriba", sample.name, "fusions.tsv")
+            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
             defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
             fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
-            #tool_results = [("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
-            tool_results = [("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
-#            tool_results = [("star_fusion", star_fusion_result)]
-            #tool_results = [("integrate", integrate_result)]
+            tool_results = [("arriba", arriba_result), ("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            #tool_results = [("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
             #determine sample_type
             """
             sample_type = ""
@@ -700,8 +838,8 @@ pandoc --to=markdown \\
         Rename genes to consensus gene names using R Limma package . This allows consistency in merging/categorizing downstream
         """
         jobs = []
-        #tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
-        tool_list = ["defuse", "fusionmap", "ericscript", "integrate"]
+        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        #tool_list = ["defuse", "fusionmap", "ericscript", "integrate"]
         out_dir = os.path.join("fusions", "cff")
         for sample in self.samples:
             job_list = []
@@ -777,8 +915,8 @@ pandoc --to=markdown \\
         cff_dir = os.path.join("fusions", "cff")
         out_dir = os.path.join("fusions", "cff")
         # put defuse .cff file last, which means inverted defuse calls will be always be "fusion2" in "generate_common_fusion_stats_by_breakpoints" function of pygeneann.py. This makes sense, since defuse is only one to make "flipped/inverted" calls. If defuse is not "fusion2" this results in errors in the case where defuse makes a flipped call
-        #tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
-        tool_list = ["fusionmap", "ericscript", "integrate", "defuse"]
+        tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
+        #tool_list = ["fusionmap", "ericscript", "integrate", "defuse"]
         for tool in tool_list:
             #cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
             cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff") for sample in self.samples])
@@ -911,7 +1049,7 @@ pandoc --to=markdown \\
                         cram2bam_job,
                         bam2fastq_job,
                         capture_job
-                    ], name="fastq_conversion_and_reads_capture +readset.sample.name")
+                    ], name="fastq_conversion_and_reads_capture" +readset.sample.name)
                     #], name="fastq_conversion_and_reads_capture"+readset.sample.name)
                                         # manually set I/O for job
                     job._input_files = [readset.cram, ref]
@@ -1124,6 +1262,8 @@ pandoc --to=markdown \\
             self.picard_sam_to_fastq,
             self.gunzip_fastq,
             self.merge_fastq,
+            self.run_arriba,
+            self.run_star_seqr,
             self.star_fusion,
             self.defuse,
             self.fusionmap,

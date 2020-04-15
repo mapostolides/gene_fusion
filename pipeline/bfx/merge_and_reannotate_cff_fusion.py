@@ -74,21 +74,22 @@ def cluster_reann_dnasupp_file(out_dir, ini_section='merge_and_reannotate_cff_fu
 
     # load seq_len used in repeat_filter step
     seq_len = config.param(repeat_filter_section, 'seq_len', type='int')
-    repeat_filtered_file = os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+    num_captured_reads = config.param('valfilter_cff_and_sample_enrichment', 'num_captured_reads', type='int')
+    filtered_file = os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len) + ".valfilter." + str(num_captured_reads))
     output_file = reann_dnasupp_file + ".cluster"
-    repeat_filter_out_file=repeat_filtered_file + ".cluster"
+    filter_out_file=filtered_file + ".cluster"
 
     return Job(
-        [reann_dnasupp_file, repeat_filtered_file],
-        [output_file,repeat_filter_out_file],
+        [reann_dnasupp_file, filtered_file],
+        [output_file,filter_out_file],
         [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
 generate_common_fusion_stats.py {reann_dnasupp_file} > {out_file} && \\
-generate_common_fusion_stats.py {repeat_filtered_file} > {repeat_filter_out_file}""".format(
+generate_common_fusion_stats.py {filtered_file} > {filter_out_file}""".format(
         reann_dnasupp_file=reann_dnasupp_file,
-        repeat_filtered_file=repeat_filtered_file,
+        filtered_file=filtered_file,
         out_file=output_file,
-        repeat_filter_out_file=repeat_filter_out_file
+        filter_out_file=filter_out_file
         ),
         removable_files=[]
     )

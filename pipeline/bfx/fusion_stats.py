@@ -28,6 +28,31 @@ from core.job import *
 
 # generates statistics on the category/cluster file, generated my the merge_and_reannotate_cff_fusion step 
 
+def covfilter(out_dir):
+
+    seq_len = config.param('repeat_filter', 'seq_len', type='int')
+    num_captured_reads = config.param('valfilter_cff_and_sample_enrichment', 'num_captured_reads', type='int')
+    coverage = config.param('fusion_stats', 'covfilter', type='int')
+    filtered_cluster_file = os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len) + ".valfilter." + str(num_captured_reads) + ".cluster")
+    covfilter_cluster_file = filtered_cluster_file + ".covfilter." + str(coverage)
+
+#python $analysis_dir/category_fusion_stats_Covfilter5.py $cluster_file $sampleinfo > $cluster_file\.covfilter5
+    return Job(
+        [filtered_cluster_file],
+        [covfilter_cluster_file],
+        [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
+        command="""\
+category_fusion_stats_Covfilter5.py \\
+  {filtered_cluster_file} \\
+  > {covfilter_cluster_file}""".format(
+        filtered_cluster_file=filtered_cluster_file,
+        covfilter_cluster_file=covfilter_cluster_file,
+        ),
+        removable_files=[],
+        name="covfilter." + str(coverage)
+    )
+
+
 def fusion_stats(in_dir, out_dir, sampleinfo_file,  ini_section='fusion_stats', repeat_filter_section='repeat_filter'):
 
     # TODO: implement other_options flags in category_fusion_stats.py

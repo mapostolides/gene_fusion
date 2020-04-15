@@ -136,9 +136,9 @@ class FusionReadsCapture(common.Illumina):
                         capture_job
                     ], name="fastq_conversion_and_reads_capture")
                     #], name="fastq_conversion_and_reads_capture"+readset.sample.name)
-                                        # manually set I/O for job
-                                        job._input_files = [readset.cram]
-                                        job._output_files = [out_bam]
+                    # manually set I/O for job
+                    job._input_files = [readset.cram]
+                    job._output_files = [out_bam]
 
                     jobs.append(job)
 
