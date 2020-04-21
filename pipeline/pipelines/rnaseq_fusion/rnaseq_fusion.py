@@ -630,13 +630,13 @@ pandoc --to=markdown \\
                 
                 jobs.append(concat_jobs([
                     mkdir_job,
-                    star_seqr.run(temp_left_fastq, temp_right_fastq, output_dir)
+                    star_seqr.run(temp_left_fastq, temp_right_fastq, output_dir, sample.name)
                 ], name="run_star_seqr." + sample.name))
                 
             else:
                 job = concat_jobs([
                     mkdir_job,
-                    star_seqr.run(left_fastqs[sample.name], right_fastqs[sample.name], output_dir)
+                    star_seqr.run(left_fastqs[sample.name], right_fastqs[sample.name], output_dir, sample.name)
                 ], name="run_star_seqr." + sample.name)
         
                 job.samples = [sample]
@@ -800,7 +800,7 @@ pandoc --to=markdown \\
         sampleinfo_file = os.path.relpath(self.args.sampleinfo.name, self.output_dir)
         
         for sample in self.samples:
-            #star_seqr_result = os.path.join("fusions", "star_seqr", sample.name, "??")
+            star_seqr_result = os.path.join("fusions", "star_seqr", sample.name + "_STAR-SEQR", sample.name + "_STAR-SEQR_candidates.txt")
             arriba_result = os.path.join("fusions", "arriba", sample.name, "fusions.tsv")
             star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
             defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
@@ -808,8 +808,7 @@ pandoc --to=markdown \\
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
-            tool_results = [("arriba", arriba_result), ("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
-            #tool_results = [("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            tool_results = [("star_seqr",star_seqr_result), ("arriba", arriba_result), ("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
             #determine sample_type
             """
             sample_type = ""
@@ -838,8 +837,7 @@ pandoc --to=markdown \\
         Rename genes to consensus gene names using R Limma package . This allows consistency in merging/categorizing downstream
         """
         jobs = []
-        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
-        #tool_list = ["defuse", "fusionmap", "ericscript", "integrate"]
+        tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
         out_dir = os.path.join("fusions", "cff")
         for sample in self.samples:
             job_list = []
@@ -859,7 +857,7 @@ pandoc --to=markdown \\
         """
         jobs = []
         cff_dir = os.path.join("fusions", "cff")
-        tool_list = ["star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
         # CREATE FUSION LIST FILES 
         cff_files = []
         for sample in self.samples:
@@ -915,8 +913,7 @@ pandoc --to=markdown \\
         cff_dir = os.path.join("fusions", "cff")
         out_dir = os.path.join("fusions", "cff")
         # put defuse .cff file last, which means inverted defuse calls will be always be "fusion2" in "generate_common_fusion_stats_by_breakpoints" function of pygeneann.py. This makes sense, since defuse is only one to make "flipped/inverted" calls. If defuse is not "fusion2" this results in errors in the case where defuse makes a flipped call
-        tool_list = ["star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
-        #tool_list = ["fusionmap", "ericscript", "integrate", "defuse"]
+        tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
         for tool in tool_list:
             #cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
             cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff") for sample in self.samples])
@@ -1262,8 +1259,8 @@ pandoc --to=markdown \\
             self.picard_sam_to_fastq,
             self.gunzip_fastq,
             self.merge_fastq,
-            self.run_arriba,
             self.run_star_seqr,
+            self.run_arriba,
             self.star_fusion,
             self.defuse,
             self.fusionmap,

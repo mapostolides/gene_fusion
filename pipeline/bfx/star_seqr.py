@@ -29,24 +29,25 @@ from core.job import *
 
 log = logging.getLogger(__name__)
 
-def run(fastqs1, fastqs2, output_dir):
+#['run_star_seqr', 'module_starseqr_python'],
+#            ['run_star_seqr', 'module_star']
+def run(fastqs1, fastqs2, output_dir, sample_name):
     if not isinstance(fastqs1, list):
         fastqs1 = [fastqs1]
         
     if not isinstance(fastqs2, list):
         fastqs2 = [fastqs2]
         
-    output_file = os.path.join(output_dir + "_STAR-SEQR", "star_seqr_STAR-SEQR_candidates.txt")
+    output_file = os.path.join(output_dir + "_STAR-SEQR", sample_name + "_STAR-SEQR_candidates.txt")
     return Job(
         fastqs1,
         [output_file],
         [
-            ['run_star_seqr', 'module_starseqr_python'],
-            ['run_star_seqr', 'module_star']
+        ['run_star_seqr', 'module_star']
         ],
 
         command="""\
-    starseqr.py -t {threads} {options} \\
+    module purge; source /home/mapostolides/miniconda3/etc/profile.d/conda.sh; conda activate starseqr2;starseqr.py -t {threads} {options} \\
       -i {genome_build} \\
       -g {gene_annot} \\
       -r {reference} \\
