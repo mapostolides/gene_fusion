@@ -33,7 +33,7 @@ def make_fusion_list(cff_file, tool, out_dir, config_file=None, ini_section='fus
         [cff_file],
         [fusion_list_file],
         command="""\
-  {fusiontools_dir}/generate_fusioninspector_fusions_list.sh \\
+  {fusiontools_dir}/generate_fusioninspector_fusions_list_cff.sh \\
   {cff_file} {fusion_list_file}""".format(
         fusiontools_dir=fusiontools_dir,
         cff_file=cff_file,

@@ -51,7 +51,7 @@ from bfx import gunzip
 from bfx import merge_fastq
 from bfx import cff_conversion
 from bfx import rename_genes 
-from bfx import fusioninspector
+from bfx import fusioninspector_cluster as fusioninspector
 from bfx import check_dna_support_before_next_exon
 from bfx import merge_and_reannotate_cff_fusion
 from bfx import repeat_filter
@@ -543,11 +543,13 @@ pandoc --to=markdown \\
             else:
                 raise Exception("Error: run type \"" + readset.run_type +
                                 "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END or SINGLE_END)!")
-
             left_fastqs[readset.sample.name].append(fastq1)
             right_fastqs[readset.sample.name].append(fastq2)
             
         for sample in self.samples:
+            #fastq1, fastq2 = self.select_input_fastq(sample)
+            #left_fastqs[sample.name].append(fastq1)
+            #right_fastqs[sample.name].append(fastq2)
             output_dir = os.path.join("fusions", "arriba", sample.name)
         
             mkdir_job = Job(command="mkdir -p " + output_dir)
@@ -580,26 +582,16 @@ pandoc --to=markdown \\
         for readset in self.readsets:
             trim_file_prefix = os.path.join("trim", readset.sample.name, readset.name + "-trimmed-")
     
-            if readset.run_type == "PAIRED_END":
-                candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
-                if readset.fastq1 and readset.fastq2:
-                    candidate_input_files.append([readset.fastq1, readset.fastq2])
-                if readset.bam:
-                    candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam),
-                                                  re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
-                [fastq1, fastq2] = self.select_input_files(candidate_input_files)
-            elif readset.run_type == "SINGLE_END":
-                candidate_input_files = [[trim_file_prefix + "single.fastq.gz"]]
-                if readset.fastq1:
-                    candidate_input_files.append([readset.fastq1])
-                if readset.bam:
-                    candidate_input_files.append([re.sub("\.bam$", ".single.fastq.gz", readset.bam)])
-                [fastq1] = self.select_input_files(candidate_input_files)
-                fastq2 = None
-    
-            else:
-                raise Exception("Error: run type \"" + readset.run_type +
-                                "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END or SINGLE_END)!")
+            candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
+            if readset.fastq1 and readset.fastq2:
+                candidate_input_files.append([readset.fastq1, readset.fastq2])
+            if readset.bam:
+                candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam),
+                                              re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
+            [fastq1, fastq2] = self.select_input_files(candidate_input_files)
+            #else:
+            #    raise Exception("Error: run type \"" + readset.run_type +
+            #                    "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END)")
 
             left_fastqs[readset.sample.name].append(fastq1)
             right_fastqs[readset.sample.name].append(fastq2)
@@ -607,7 +599,6 @@ pandoc --to=markdown \\
 
         for sample in self.samples:
             output_dir = os.path.join("fusions", "star_seqr", sample.name)
-            
             star_seqr_dir = os.path.join(output_dir, "temp_fastq")
             
             mkdir_job = Job(command="mkdir -p " + star_seqr_dir)
@@ -627,7 +618,6 @@ pandoc --to=markdown \\
                         removable_files=[temp_right_fastq]),
                 ], name="concat_readset." + sample.name))
                 
-                
                 jobs.append(concat_jobs([
                     mkdir_job,
                     star_seqr.run(temp_left_fastq, temp_right_fastq, output_dir, sample.name)
@@ -643,7 +633,6 @@ pandoc --to=markdown \\
                 jobs.append(job)
 
         return jobs
-
 
 
     def star_fusion(self):
@@ -851,24 +840,60 @@ pandoc --to=markdown \\
         return jobs
 
 
+#    def fusioninspector(self):
+#        """
+#        Create fusion_list files for input to fusioninspector, and run fusioninspector on all samples for all callers separately 
+#        """
+#        jobs = []
+#        cff_dir = os.path.join("fusions", "cff")
+#        tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+#        # CREATE FUSION LIST FILES 
+#        cff_files = []
+#        for sample in self.samples:
+#            fusion_list_out_dir = os.path.join("fusions", "fusioninspector", "FI_fusion_list_files", sample.name)
+#            job_list = []
+#            job_list.append(Job(command="mkdir -p " + fusion_list_out_dir))
+#            # create job_list for current sample
+#            for tool in tool_list:
+#                cff_file = os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed")
+#                fusion_list_job = fusioninspector.make_fusion_list(cff_file, tool, fusion_list_out_dir)
+#                job_list.append(fusion_list_job)
+#            # concat jobs
+#            job = concat_jobs(job_list, name= "make_fusion_list." + sample.name )
+#            jobs.append(job)
+#        # RUN FUSIONINSPECTOR
+#        #select input fastq files 
+#        for sample in self.samples:
+#            fusion_list_out_dir = os.path.join("fusions", "fusioninspector", "FI_fusion_list_files", sample.name)
+#            fastq1, fastq2 = self.select_input_fastq(sample)
+#            # run fusioninspector for each tool separately
+#            for tool in tool_list:
+#                out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name, tool )
+#                fusion_list_file = os.path.join(fusion_list_out_dir, tool + ".fusion_list.txt")
+#                fusioninspector_job = fusioninspector.fusioninspector(fastq1, fastq2, out_dir, fusion_list_file)
+#                job = concat_jobs([
+#                    Job(command="mkdir -p " + out_dir),
+#                    fusioninspector_job
+#                ], name="fusioninspector." + sample.name + "." + tool)
+#                jobs.append(job)
+#        return jobs
+
+
     def fusioninspector(self):
         """
         Create fusion_list files for input to fusioninspector, and run fusioninspector on all samples for all callers separately 
         """
         jobs = []
         cff_dir = os.path.join("fusions", "cff")
-        tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
         # CREATE FUSION LIST FILES 
-        cff_files = []
         for sample in self.samples:
             fusion_list_out_dir = os.path.join("fusions", "fusioninspector", "FI_fusion_list_files", sample.name)
             job_list = []
             job_list.append(Job(command="mkdir -p " + fusion_list_out_dir))
             # create job_list for current sample
-            for tool in tool_list:
-                cff_file = os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed")
-                fusion_list_job = fusioninspector.make_fusion_list(cff_file, tool, fusion_list_out_dir)
-                job_list.append(fusion_list_job)
+            cluster_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.cluster")
+            fusion_list_job = fusioninspector.make_fusion_list(cluster_file, sample.name, fusion_list_out_dir)
+            job_list.append(fusion_list_job)
             # concat jobs
             job = concat_jobs(job_list, name= "make_fusion_list." + sample.name )
             jobs.append(job)
@@ -877,16 +902,14 @@ pandoc --to=markdown \\
         for sample in self.samples:
             fusion_list_out_dir = os.path.join("fusions", "fusioninspector", "FI_fusion_list_files", sample.name)
             fastq1, fastq2 = self.select_input_fastq(sample)
-            # run fusioninspector for each tool separately
-            for tool in tool_list:
-                out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name, tool )
-                fusion_list_file = os.path.join(fusion_list_out_dir, tool + ".fusion_list.txt")
-                fusioninspector_job = fusioninspector.fusioninspector(fastq1, fastq2, out_dir, fusion_list_file)
-                job = concat_jobs([
+            out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name)
+            fusion_list_file = os.path.join(fusion_list_out_dir, sample.name + ".fusion_list.txt")
+            fusioninspector_job = fusioninspector.fusioninspector(fastq1, fastq2, out_dir, fusion_list_file)
+            job = concat_jobs([
                     Job(command="mkdir -p " + out_dir),
                     fusioninspector_job
-                ], name="fusioninspector." + sample.name + "." + tool)
-                jobs.append(job)
+                ], name="fusioninspector." + sample.name)
+            jobs.append(job)
         return jobs
 
     def filter_cff_calls_using_fusioninspector_results(self):
@@ -897,12 +920,27 @@ pandoc --to=markdown \\
             job_list = []
             filtered_out_dir = os.path.join("fusions", "cff_filtered", sample.name)
             job_list.append([Job(command="mkdir -p " + filtered_outdir)])
-            for tool in tool_list:
-                FI_out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name, tool ) 
-                filter_job = fusioninspector.filter_cff_calls_using_FI_results(FI_out_dir, filtered_out_dir, sample, tool, cff_dir)
-                job_list.append(filter_job)
+            FI_out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name) 
+            filter_job = fusioninspector.filter_cff_calls_using_FI_results(FI_out_dir, filtered_out_dir, sample, cff_dir)
+            job_list.append(filter_job)
             job = concat_jobs(job_list, name= "filter_cff." + sample.name )
         return jobs
+
+#    def filter_cff_calls_using_fusioninspector_results(self):
+#        jobs = []
+#        cff_dir = os.path.join("fusions", "cff")
+#        # FILTER CFF FUSIONS USING FUSIONINSPECTOR OUTPUT
+#        for sample in self.samples:
+#            job_list = []
+#            filtered_out_dir = os.path.join("fusions", "cff_filtered", sample.name)
+#            job_list.append([Job(command="mkdir -p " + filtered_outdir)])
+#            for tool in tool_list:
+#                FI_out_dir = os.path.join("fusions", "fusioninspector", "fusioninspector_output", sample.name, tool ) 
+#                filter_job = fusioninspector.filter_cff_calls_using_FI_results(FI_out_dir, filtered_out_dir, sample, tool, cff_dir)
+#                job_list.append(filter_job)
+#            job = concat_jobs(job_list, name= "filter_cff." + sample.name )
+#        return jobs
+
 
     def merge_cff_fusion(self):
         """
@@ -980,7 +1018,8 @@ pandoc --to=markdown \\
 
         jobs = []
         cff_dir = os.path.join("fusions", "cff")
-        cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter.30")
+        #cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter.30")
+        cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp")
         out_dir = os.path.join("fusion_reads_capture", "fusion_refs")
 
         build_job = build_fusion_and_head_gene_ref.build_fusion_and_head_gene_ref(cff_file, out_dir)
@@ -1000,7 +1039,8 @@ pandoc --to=markdown \\
         # make .cff file of repeat_filter step input to this step
         seq_len = config.param('repeat_filter', 'seq_len', type='int')
         cff_dir = os.path.join("fusions", "cff")
-        cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+        #cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+        cff_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp")
         ref = os.path.join("fusion_reads_capture", "fusion_refs", os.path.basename(cff_file)+".fa")
         #TODO make sure cram file works
         #cram_file = self.args.cff.name
@@ -1149,7 +1189,8 @@ pandoc --to=markdown \\
         jobs.append(filter_merged_summary_job)
         #2) filter .cff and sample enrichment
         seq_len = config.param('repeat_filter', 'seq_len', type='int')
-        cff_file = os.path.join("fusions", "cff", "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+        #cff_file = os.path.join("fusions", "cff", "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+        cff_file = os.path.join("fusions", "cff", "merged.cff.reann.dnasupp")
         filtered_sum_file = os.path.join(merged_summary_dir, "merged." + str(num_captured_reads) +  ".summary")
         filter_cff_sample_enrichment_job = valfilter.filter_cff_and_sample_enrichment(filtered_sum_file, cff_file)
         jobs.append(filter_cff_sample_enrichment_job)
@@ -1286,9 +1327,10 @@ pandoc --to=markdown \\
             # MERGE .cff ENTRIES
             self.cluster_reann_dnasupp_file,
             self.covfilter,
+            self.fusioninspector,
             self.fusion_stats,
-            self.validate_fusions
-            #self.delete_fastqs
+            self.validate_fusions,
+            self.delete_fastqs
         ]
 
 if __name__ == '__main__':

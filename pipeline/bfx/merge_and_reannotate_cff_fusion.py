@@ -77,25 +77,30 @@ def cluster_reann_dnasupp_file(out_dir, ini_section='merge_and_reannotate_cff_fu
     #input files
     reann_dnasupp_file = os.path.join(out_dir, "merged.cff.reann.dnasupp")
     filtered_file_bwa = os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len))
+    filtered_file_val = os.path.join(out_dir, "merged.cff.reann.dnasupp" + ".valfilter." + str(num_captured_reads))
     filtered_file_bwa_val = os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len) + ".valfilter." + str(num_captured_reads))
     #output files
     output_file = reann_dnasupp_file + ".cluster"
     filter_bwa_out_file=filtered_file_bwa + ".cluster"
+    filter_val_out_file=filtered_file_val + ".cluster"
     filter_bwa_val_out_file=filtered_file_bwa_val + ".cluster"
 
     return Job(
-        [reann_dnasupp_file, filtered_file_bwa, filtered_file_bwa_val],
-        [output_file, filter_bwa_out_file, filter_bwa_val_out_file],
+        [reann_dnasupp_file, filtered_file_bwa, filtered_file_val, filtered_file_bwa_val],
+        [output_file, filter_bwa_out_file, filter_val_out_file, filter_bwa_val_out_file],
         [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
-generate_common_fusion_stats.py {reann_dnasupp_file} > {out_file} && \\
+generate_common_fusion_stats.py {reann_dnasupp_file} > {output_file} && \\
 generate_common_fusion_stats.py {filtered_file_bwa} > {filter_bwa_out_file} && \\
+generate_common_fusion_stats.py {filtered_file_val} > {filter_val_out_file} && \\
 generate_common_fusion_stats.py {filtered_file_bwa_val} > {filter_bwa_val_out_file}""".format(
         reann_dnasupp_file=reann_dnasupp_file,
         filtered_file_bwa=filtered_file_bwa,
+        filtered_file_val=filtered_file_val,
         filtered_file_bwa_val=filtered_file_bwa_val,
-        out_file=output_file,
+        output_file=output_file,
         filter_bwa_out_file=filter_bwa_out_file,
+        filter_val_out_file=filter_val_out_file,
         filter_bwa_val_out_file=filter_bwa_val_out_file
         ),
         removable_files=[]

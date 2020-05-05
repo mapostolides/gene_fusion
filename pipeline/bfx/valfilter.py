@@ -46,18 +46,29 @@ awk -v cov="{num_captured_reads}" '$8 >= cov' {sum_file} | sort > {filtered_sum_
     )
 
 #/hpf/largeprojects/ccmbio/mapostolides/reads_capture/stjude_reads_capture/filter_cff_file_using_validation_pipeline_output_SAMPLE_ENRICHMENT_A_TP_NT.py
-def filter_cff_and_sample_enrichment(filtered_sum_file, cff_file):
+def filter_cff_and_sample_enrichment(filtered_sum_file, cff_file, ini_section='repeat_filter'):
     num_captured_reads = config.param('valfilter_cff_and_sample_enrichment', 'num_captured_reads', type='int') 
+    seq_len=config.param(ini_section, 'seq_len', type='int')
+
+    ##cff_file_valfiltered = os.path.join(".".join([cff_file, "valfilter", str(num_captured_reads)]))
+    # INPUT FILES
+    cff_file_bwafilter = os.path.join(".".join([cff_file,"bwafilter", str(seq_len)]))
+    # OUTPUT FILES
     cff_file_valfiltered = os.path.join(".".join([cff_file, "valfilter", str(num_captured_reads)]))
+    cff_file_bwafilter_valfiltered = os.path.join(".".join([cff_file,"bwafilter", str(seq_len), "valfilter", str(num_captured_reads)]))
+
     return Job(
-        [filtered_sum_file, cff_file],
-        [cff_file_valfiltered],
+        [filtered_sum_file, cff_file, cff_file_bwafilter],
+        [cff_file_valfiltered, cff_file_bwafilter_valfiltered],
         [['cff_conversion', 'module_fusiontools']],
         command="""\
-filter_cff_and_sample_enrichment_using_reads_capture_output.py {filtered_sum_file} {cff_file} > {cff_file_valfiltered}""".format(
+filter_cff_and_sample_enrichment_using_reads_capture_output.py {filtered_sum_file} {cff_file} > {cff_file_valfiltered} &&
+filter_cff_and_sample_enrichment_using_reads_capture_output.py {filtered_sum_file} {cff_file_bwafilter} > {cff_file_bwafilter_valfiltered}""".format(
         filtered_sum_file=filtered_sum_file,
         cff_file=cff_file,
-        cff_file_valfiltered=cff_file_valfiltered
+        cff_file_bwafilter=cff_file_bwafilter,
+        cff_file_valfiltered=cff_file_valfiltered,
+        cff_file_bwafilter_valfiltered=cff_file_bwafilter_valfiltered
         ),
         removable_files=[],
         name="cff_file_valfilter_and_sample_enrichment"
