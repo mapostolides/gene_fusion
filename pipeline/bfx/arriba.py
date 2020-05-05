@@ -44,7 +44,7 @@ def run(fastqs1, fastqs2, output_dir):
       {blacklist} \\
       {fastq1} \\
       {fastq2} \\
-      {threads}""".format(
+      {threads} && ls -d {output_dir}/* | grep -v 'fusions\|junction' | xargs rm -rf """.format(
             genome_build=config.param('run_arriba', 'genome_build'),
             gene_annot=config.param('run_arriba', 'gene_annot'),
             reference=config.param('run_arriba', 'reference'),
@@ -53,5 +53,6 @@ def run(fastqs1, fastqs2, output_dir):
             options=config.param('run_arriba', 'options'),
             fastq1=",".join(fastq1 for fastq1 in fastqs1),
             fastq2=",".join(fastq2 for fastq2 in fastqs2),
+            output_dir=output_dir
         ),
     )
