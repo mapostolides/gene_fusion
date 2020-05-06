@@ -151,6 +151,8 @@ class RnaFusion(common.Illumina):
         self.argparser.add_argument("--dnabam", help="DNA bam list", type=file)
         # add optional fusion validation file for pipeline validation mode
         self.argparser.add_argument("--valfile", required=False, help="fusion validation set file", type=file)
+        #Class variables
+        self.tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
         super(RnaFusion, self).__init__()
 
     def star(self):
@@ -561,7 +563,7 @@ pandoc --to=markdown \\
             job = concat_jobs([
                 mkdir_job,
                 chgdir_job,
-                arriba.run(left_fastqs[sample.name], right_fastqs[sample.name], output_dir),
+                arriba.run(left_fastqs[sample.name], right_fastqs[sample.name], self._output_dir, output_dir),
                 back_to_outdir_job
             ], name="run_arriba." + sample.name)
             job.samples = [sample]
@@ -789,6 +791,8 @@ pandoc --to=markdown \\
         sampleinfo_file = os.path.relpath(self.args.sampleinfo.name, self.output_dir)
         
         for sample in self.samples:
+            
+            #self.tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
             star_seqr_result = os.path.join("fusions", "star_seqr", sample.name + "_STAR-SEQR", sample.name + "_STAR-SEQR_candidates.txt")
             arriba_result = os.path.join("fusions", "arriba", sample.name, "fusions.tsv")
             star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
@@ -826,12 +830,13 @@ pandoc --to=markdown \\
         Rename genes to consensus gene names using R Limma package . This allows consistency in merging/categorizing downstream
         """
         jobs = []
-        tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        self.tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
         out_dir = os.path.join("fusions", "cff")
         for sample in self.samples:
             job_list = []
             # create separate "rename_genes" job for each sample
-            for tool in tool_list:
+            for tool in self.tool_list:
+            #for tool in tool_list:
                 rename_genes_job = rename_genes.rename_cff_file_genes(sample, tool, out_dir)
                 job_list.append(rename_genes_job)
             # concat jobs
@@ -951,8 +956,8 @@ pandoc --to=markdown \\
         cff_dir = os.path.join("fusions", "cff")
         out_dir = os.path.join("fusions", "cff")
         # put defuse .cff file last, which means inverted defuse calls will be always be "fusion2" in "generate_common_fusion_stats_by_breakpoints" function of pygeneann.py. This makes sense, since defuse is only one to make "flipped/inverted" calls. If defuse is not "fusion2" this results in errors in the case where defuse makes a flipped call
-        tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
-        for tool in tool_list:
+        #tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
+        for tool in self.tool_list:
             #cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff.renamed") for sample in self.samples])
             cff_files.extend([os.path.join(cff_dir, sample.name + "." + tool + ".cff") for sample in self.samples])
         merge_job = merge_and_reannotate_cff_fusion.merge_cff_fusion(cff_files, out_dir)

@@ -32,24 +32,42 @@ def covfilter(out_dir):
 
     seq_len = config.param('repeat_filter', 'seq_len', type='int')
     num_captured_reads = config.param('valfilter_cff_and_sample_enrichment', 'num_captured_reads', type='int')
-    coverage = config.param('fusion_stats', 'covfilter', type='int')
-    filtered_cluster_file = os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len) + ".valfilter." + str(num_captured_reads) + ".cluster")
-    covfilter_cluster_file = filtered_cluster_file + ".covfilter." + str(coverage)
+    cov = config.param('fusion_stats', 'covfilter', type='int')
+
+    # input files
+    cluster_file = os.path.join(out_dir, "merged.cff.reann.dnasupp.cluster") 
+    filter_bwa_cluster_file= os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len) + ".cluster" )
+    filter_val_cluster_file= os.path.join(out_dir, "merged.cff.reann.dnasupp" + ".valfilter." + str(num_captured_reads) + ".cluster" ) 
+    filter_bwa_val_cluster_file= os.path.join(out_dir, "merged.cff.reann.dnasupp.bwafilter." + str(seq_len) + ".valfilter." + str(num_captured_reads) + ".cluster" )
+
+    # output files
+    cluster_file_cov = cluster_file + ".covfilter." + str(cov)
+    cluster_file_bwa_cov = filter_bwa_cluster_file + ".covfilter." + str(cov)
+    cluster_file_val_cov = filter_val_cluster_file + ".covfilter." + str(cov)
+    cluster_file_bwa_val_cov = filter_bwa_val_cluster_file + ".covfilter." + str(cov)
 
 #python $analysis_dir/category_fusion_stats_Covfilter5.py $cluster_file $sampleinfo > $cluster_file\.covfilter5
     return Job(
-        [filtered_cluster_file],
-        [covfilter_cluster_file],
+        [cluster_file, filter_bwa_cluster_file, filter_val_cluster_file, filter_bwa_val_cluster_file],
+        [cluster_file_cov, cluster_file_bwa_cov, cluster_file_val_cov, cluster_file_bwa_val_cov],
         [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
-category_fusion_stats_Covfilter5.py \\
-  {filtered_cluster_file} \\
-  > {covfilter_cluster_file}""".format(
-        filtered_cluster_file=filtered_cluster_file,
-        covfilter_cluster_file=covfilter_cluster_file,
+category_fusion_stats_Covfilter.py {cluster_file} {cov}  > {cluster_file_cov} && \\
+category_fusion_stats_Covfilter.py {filter_bwa_cluster_file} {cov}  > {cluster_file_bwa_cov} && \\
+category_fusion_stats_Covfilter.py {filter_val_cluster_file} {cov}  > {cluster_file_val_cov} && \\
+category_fusion_stats_Covfilter.py {filter_bwa_val_cluster_file} {cov}  > {cluster_file_bwa_val_cov}""".format(
+        cov=cov,
+        cluster_file=cluster_file,
+        filter_bwa_cluster_file=filter_bwa_cluster_file,
+        filter_val_cluster_file=filter_val_cluster_file,
+        filter_bwa_val_cluster_file=filter_bwa_val_cluster_file,
+        cluster_file_cov=cluster_file_cov,
+        cluster_file_bwa_cov=cluster_file_bwa_cov,
+        cluster_file_val_cov=cluster_file_val_cov,
+        cluster_file_bwa_val_cov=cluster_file_bwa_val_cov
         ),
         removable_files=[],
-        name="covfilter." + str(coverage)
+        name="covfilter." + str(cov)
     )
 
 
