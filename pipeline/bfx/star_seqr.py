@@ -38,12 +38,11 @@ def run(fastqs1, fastqs2, output_dir, sample_name):
     if not isinstance(fastqs2, list):
         fastqs2 = [fastqs2]
     prefix="out"
-    output_file = os.path.join(output_dir + "_STAR-SEQR", sample_name + "_STAR-SEQR_candidates.txt")
-    #fusions/star_seqr/smc_rna_sim45_STAR-SEQR/smc_rna_sim45_STAR-SEQR_candidates.txt    
-    output_file = os.path.join(output_dir, + "_STAR-SEQR", sample_name + "_STAR-SEQR_candidates.txt")
+    #output_file = os.path.join(output_dir + "_STAR-SEQR", sample_name + "_STAR-SEQR_candidates.txt")
+    output_file = os.path.join(output_dir, prefix + "_STAR-SEQR", prefix  + "_STAR-SEQR_candidates.txt")
     #fusions/star_seqr/smc_rna_sim45/out_STAR-SEQR/out_STAR-SEQR_candidates.txt
     return Job(
-        fastqs1,
+        fastqs1 + fastqs2,
         [output_file],
         [
         ['run_star_seqr', 'module_star']
@@ -56,7 +55,7 @@ def run(fastqs1, fastqs2, output_dir, sample_name):
       -r {reference} \\
       -1 {fastq1} \\
       -2 {fastq2} \\
-      -p {output_dir}/out """.format(
+      -p {output_dir}/{prefix} && ls -d {output_dir}/{prefix}_STAR-SEQR/* | grep -v 'candidates\|breakpoints\|Chimeric.out.junction' | xargs rm -rf  """.format(
             genome_build=config.param('run_star_seqr', 'genome_build'),
             gene_annot=config.param('run_star_seqr', 'gene_annot'),
             reference=config.param('run_star_seqr', 'reference'),
@@ -65,6 +64,7 @@ def run(fastqs1, fastqs2, output_dir, sample_name):
             fastq1=",".join(fastq1 for fastq1 in fastqs1),
             fastq2=",".join(fastq2 for fastq2 in fastqs2),
             output_dir=output_dir,
+            prefix=prefix
         ),
     )
-      #-p {output_dir}/out_ && ls -d {output_dir}/* | grep -v 'junction\|Chimeric\|breakpoints' | xargs rm -rf """.format(
+      #&& ls -d {output_dir}/{prefix}_STAR-SEQR | grep -v 'candidates\|breakpoints\|Chimeric.out.junction' | xargs rm -rf """.format(

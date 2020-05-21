@@ -1315,7 +1315,7 @@ pandoc --to=markdown \\
             self.integrate,
             self.integrate_make_result_file,
             self.convert_fusion_results_to_cff,
-            #self.rename_genes,
+            self.rename_genes,
             #self.fusioninspector
             #self.filter_cff_calls_using_fusioninspector_results,
             self.merge_cff_fusion,
