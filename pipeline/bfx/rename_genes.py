@@ -26,20 +26,22 @@ import os
 from core.config import *
 from core.job import *
 
-def rename_cff_file_genes(sample, tool, out_dir, ini_section='rename_genes'):
+def rename_cff_file_genes(cff_file, out_dir, ini_section='rename_genes'):
 
-    cff_file = os.path.join(out_dir, sample.name + "." + tool + ".cff")
-    cff_file_renamed = os.path.join(out_dir, sample.name + "." + tool + ".cff.renamed")
+    #cff_file = os.path.join(out_dir, sample.name + "." + tool + ".cff")
+    cff_file_renamed = cff_file + ".renamed"
+    gene_info_file=config.param(ini_section, 'gene_info_file', required=True)
 
     return Job(
         [cff_file],
         [cff_file_renamed],
-        [],
+        [["rename_genes", "module_fusiontools"]],
         command="""\
-pwd; /hpf/largeprojects/ccmbio/mapostolides/mugqic_tools-my-version/python-tools/fusiontools/0.1.0/bin/validation_pipeline/Pipeline-scripts/rename_cff_file_genes-GENAP.py \\
-  {cff_file} \\
+rename_cff_file_genes-GENAP.py \\
+  {cff_file} {gene_info_file} \\
   > {cff_file_renamed} """.format(
         cff_file=cff_file,
+        gene_info_file=gene_info_file,
         cff_file_renamed=cff_file_renamed
         ),
         removable_files=[]

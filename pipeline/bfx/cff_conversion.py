@@ -27,7 +27,6 @@ from core.config import *
 from core.job import *
 
 def cff_convert(sample, fusion_result_file, sample_info_file, tool, out_dir, ini_section='cff_conversion'):
-
     return Job(
         [fusion_result_file],
         [os.path.join(out_dir, sample+"."+tool+".cff")],

@@ -55,6 +55,7 @@ from bfx import fusioninspector_cluster as fusioninspector
 from bfx import check_dna_support_before_next_exon
 from bfx import merge_and_reannotate_cff_fusion
 from bfx import repeat_filter
+from bfx import custom_filters 
 from bfx import fusion_stats
 from bfx import validate_fusions
 from bfx import delete_fastqs
@@ -578,61 +579,29 @@ pandoc --to=markdown \\
         """
 
         jobs = []
-        left_fastqs = defaultdict(list)
-        right_fastqs = defaultdict(list)
-
-        for readset in self.readsets:
-            trim_file_prefix = os.path.join("trim", readset.sample.name, readset.name + "-trimmed-")
-    
-            candidate_input_files = [[trim_file_prefix + "pair1.fastq.gz", trim_file_prefix + "pair2.fastq.gz"]]
-            if readset.fastq1 and readset.fastq2:
-                candidate_input_files.append([readset.fastq1, readset.fastq2])
-            if readset.bam:
-                candidate_input_files.append([re.sub("\.bam$", ".pair1.fastq.gz", readset.bam),
-                                              re.sub("\.bam$", ".pair2.fastq.gz", readset.bam)])
-            [fastq1, fastq2] = self.select_input_files(candidate_input_files)
-            #else:
-            #    raise Exception("Error: run type \"" + readset.run_type +
-            #                    "\" is invalid for readset \"" + readset.name + "\" (should be PAIRED_END)")
-
-            left_fastqs[readset.sample.name].append(fastq1)
-            right_fastqs[readset.sample.name].append(fastq2)
-
-
         for sample in self.samples:
-            output_dir = os.path.join("fusions", "star_seqr", sample.name)
-            star_seqr_dir = os.path.join(output_dir, "temp_fastq")
-            
-            mkdir_job = Job(command="mkdir -p " + star_seqr_dir)
-            
-            temp_left_fastq = os.path.join("trim", sample.name, sample.name + ".pair1.fastq.gz")
-            temp_right_fastq = os.path.join("trim", sample.name, sample.name + ".pair2.fastq.gz")
-    
-            if len(left_fastqs[sample.name]) > 1:
-    
-                jobs.append(concat_jobs([
-                    mkdir_job,
-                    Job(left_fastqs[sample.name], [temp_left_fastq],
-                        command="zcat " + " " + " ".join(left_fastqs[sample.name]) + " | gzip -cf > " + temp_left_fastq,
-                        removable_files=[temp_left_fastq]),
-                    Job(right_fastqs[sample.name], [temp_right_fastq],
-                        command="zcat " + " " + " ".join(right_fastqs[sample.name]) + " | gzip -cf > " + temp_right_fastq,
-                        removable_files=[temp_right_fastq]),
-                ], name="concat_readset." + sample.name))
-                
-                jobs.append(concat_jobs([
-                    mkdir_job,
-                    star_seqr.run(temp_left_fastq, temp_right_fastq, output_dir, sample.name)
-                ], name="run_star_seqr." + sample.name))
-                
+            if len(sample.readsets) > 1: 
+                raise Exception("Error: only one read set per sample allowed") 
+            if sample.readsets[0].bam:#.bam input
+                fastq_dir = os.path.join("fusions", "picard_sam_to_fastq", sample.name)     
+                left_fastq = os.path.join(fastq_dir, sample.name + ".sorted.mdup.pair1.fastq.gz")
+                right_fastq = os.path.join(fastq_dir, sample.name + ".sorted.mdup.pair2.fastq.gz")
+            elif sample.readsets[0].fastq2 and sample.readsets[0].fastq2.split(".")[-1] == "gz":
+                #print(sample.readsets[0].fastq2)
+                #print(sample.readsets[0].fastq2.split(".")[-1])
+                left_fastq = sample.readsets[0].fastq1 
+                right_fastq = sample.readsets[0].fastq2 
             else:
-                job = concat_jobs([
-                    mkdir_job,
-                    star_seqr.run(left_fastqs[sample.name], right_fastqs[sample.name], output_dir, sample.name)
-                ], name="run_star_seqr." + sample.name)
+                raise Exception("Error: only .bam and .fastq.gz inputs allowed")
+            output_dir = os.path.join("fusions", "star_seqr", sample.name)
+
+            job = concat_jobs([
+                Job(command="mkdir -p " + output_dir),
+                star_seqr.run(left_fastq, right_fastq, output_dir, sample.name)
+            ], name="run_star_seqr." + sample.name)
         
-                job.samples = [sample]
-                jobs.append(job)
+            job.samples = [sample]
+            jobs.append(job)
 
         return jobs
 
@@ -793,7 +762,8 @@ pandoc --to=markdown \\
         for sample in self.samples:
             
             #self.tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
-            star_seqr_result = os.path.join("fusions", "star_seqr", sample.name + "_STAR-SEQR", sample.name + "_STAR-SEQR_candidates.txt")
+            star_seqr_result = os.path.join("fusions", "star_seqr", sample.name, "out_STAR-SEQR", "out_STAR-SEQR_candidates.txt")
+            #print >> sys.stderr, star_seqr_result 
             arriba_result = os.path.join("fusions", "arriba", sample.name, "fusions.tsv")
             star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
             defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
@@ -802,6 +772,7 @@ pandoc --to=markdown \\
             integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
 
             tool_results = [("star_seqr",star_seqr_result), ("arriba", arriba_result), ("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
+            #tool_results = [("arriba", arriba_result), ("star_fusion", star_fusion_result), ("defuse", defuse_result), ("fusionmap", fusionmap_result), ("ericscript", ericscript_result), ("integrate", integrate_result)]
             #determine sample_type
             """
             sample_type = ""
@@ -823,25 +794,6 @@ pandoc --to=markdown \\
                 job_list.append(job)
         job = concat_jobs(job_list, name="cff_conversion")
         jobs.append(job)
-        return jobs
-
-    def rename_genes(self):
-        """ 
-        Rename genes to consensus gene names using R Limma package . This allows consistency in merging/categorizing downstream
-        """
-        jobs = []
-        self.tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
-        out_dir = os.path.join("fusions", "cff")
-        for sample in self.samples:
-            job_list = []
-            # create separate "rename_genes" job for each sample
-            for tool in self.tool_list:
-            #for tool in tool_list:
-                rename_genes_job = rename_genes.rename_cff_file_genes(sample, tool, out_dir)
-                job_list.append(rename_genes_job)
-            # concat jobs
-            job = concat_jobs(job_list, name= "rename_genes." + sample.name )
-            jobs.append(job)
         return jobs
 
 
@@ -965,6 +917,21 @@ pandoc --to=markdown \\
         job = concat_jobs([ merge_job ], name="merge_cff_fusion")
         jobs.append(job)
         return jobs
+
+    def rename_genes(self):
+        """ 
+        Rename genes to consensus gene names using custom renaming script . This allows consistency in merging/categorizing downstream
+        """
+        jobs = []
+        self.tool_list = ["star_seqr", "arriba", "star_fusion", "defuse", "fusionmap", "ericscript", "integrate"]
+        out_dir = os.path.join("fusions", "cff")
+        rename_genes_job = rename_genes.rename_cff_file_genes(os.path.join(out_dir, "merged.cff"), out_dir)
+        rename_genes_job._name = "rename_cff_genes"
+        #job = concat_jobs(rename_genes_job, name= "rename_cff_genes" )
+        jobs.append(rename_genes_job) 
+
+        return jobs
+
     
     def reannotate_cff_fusion(self):
         """
@@ -1224,15 +1191,23 @@ pandoc --to=markdown \\
         jobs.append(job)
         return jobs
 
-    def covfilter(self):
+    def custom_filters(self):
         """
-        Filters .cluster file based on split and spanning reads
+        Includes blacklist_filter, callerfilter2 and ReadThrough filter 
         """
         jobs = []
-        out_dir = os.path.join("fusions", "cff")
+        cff_dir = os.path.join("fusions", "cff")
+        cluster_file=os.path.join(cff_dir, "merged.cff.renamed.reann.cluster")
+        custom_filter_job= custom_filters.custom_filters(cff_dir, cluster_file)
+        
+        #category_filter_job = fusion_stats.category_filter(cluster_file)
+        #caller_filter_job = fusion_stats.caller_filter(cluster_file)
 
-        covfilter_job = fusion_stats.covfilter(out_dir)
-        jobs.append(covfilter_job)
+        #covfilter_job = fusion_stats.covfilter(out_dir)
+        filter_job = concat_jobs([
+           custom_filter_job
+        ], name="custom_filters")
+        jobs.append(filter_job)
         return jobs
   
     def fusion_stats(self):
@@ -1315,26 +1290,26 @@ pandoc --to=markdown \\
             self.integrate,
             self.integrate_make_result_file,
             self.convert_fusion_results_to_cff,
-            self.rename_genes,
             #self.fusioninspector
             #self.filter_cff_calls_using_fusioninspector_results,
             self.merge_cff_fusion,
+            self.rename_genes,
             self.reannotate_cff_fusion,
-            self.check_dna_support_before_next_exon,
-            self.repeat_filter,
+            #self.check_dna_support_before_next_exon,
+            #self.repeat_filter,
             # VALIDATION PIPELINE
-            self.build_fusion_and_head_gene_ref,
-            self.fastq_conversion_and_reads_capture,
-            self.extract_captured_reads_and_realn,
-            self.filter_caputred_reads,
-            self.merge_and_summary,
-            self.valfilter_cff_and_sample_enrichment,
+            #self.build_fusion_and_head_gene_ref,
+            #self.fastq_conversion_and_reads_capture,
+            #self.extract_captured_reads_and_realn,
+            #self.filter_caputred_reads,
+            #self.merge_and_summary,
+            #self.valfilter_cff_and_sample_enrichment,
             # MERGE .cff ENTRIES
             self.cluster_reann_dnasupp_file,
-            self.covfilter,
-            self.fusioninspector,
-            self.fusion_stats,
-            self.validate_fusions,
+            self.custom_filters,
+            #self.fusioninspector,
+            #self.fusion_stats,
+            #self.validate_fusions,
             self.delete_fastqs
         ]
 
