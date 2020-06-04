@@ -584,8 +584,11 @@ pandoc --to=markdown \\
                 raise Exception("Error: only one read set per sample allowed") 
             if sample.readsets[0].bam:#.bam input
                 fastq_dir = os.path.join("fusions", "picard_sam_to_fastq", sample.name)     
-                left_fastq = os.path.join(fastq_dir, sample.name + ".sorted.mdup.pair1.fastq.gz")
-                right_fastq = os.path.join(fastq_dir, sample.name + ".sorted.mdup.pair2.fastq.gz")
+                bam = sample.readsets[0].bam
+                #fastq1 = os.path.join(out_dir, os.path.basename(re.sub("\.bam$", ".pair1.fastq.gz", out_bam)))
+                #fastq2 = os.path.join(out_dir, os.path.basename(re.sub("\.bam$", ".pair2.fastq.gz", out_bam)))
+                left_fastq=os.path.join(fastq_dir, os.path.basename(re.sub("\.bam$", ".pair1.fastq.gz", bam)))
+                right_fastq=os.path.join(fastq_dir, os.path.basename(re.sub("\.bam$", ".pair1.fastq.gz", bam)))
             elif sample.readsets[0].fastq2 and sample.readsets[0].fastq2.split(".")[-1] == "gz":
                 #print(sample.readsets[0].fastq2)
                 #print(sample.readsets[0].fastq2.split(".")[-1])
@@ -1210,6 +1213,27 @@ pandoc --to=markdown \\
         jobs.append(filter_job)
         return jobs
   
+    def validate_fusions(self):
+        """
+        Compares the pipeline output in merged.cff.reann.dnasupp.bwafilter.30.cluster with the predetermined
+        fusion gene test file.This step should be run only with a test .bam/.fastq file, in order to confirm 
+        detection of validated fusions which are known to bepresent in the sample.
+        Requires --valfile flag, with corresponding file containing gene pairs
+        """
+        outdir = os.path.join("fusions", "cff")
+        cluster = os.path.join(outdir, "merged.cff.renamed.reann.cluster.blck_filter.RT_filter.callerfilter2")
+        jobs = []
+        #/hpf/largeprojects/ccmbio/mapostolides/MODULES/RUN_BENCHMARKING_TOOLKIT/benchmarking_cluster-GENAP.sh {outdir} {truth_fusions} {cff} {cluster} true true true true false
+        validate_fusions_job = validate_fusions.validate_fusions(outdir, cluster, self.args.valfile.name)
+
+        job = concat_jobs([
+            Job(command="mkdir -p " + outdir),
+            validate_fusions_job
+        ], name="validate_fusions")
+
+        jobs.append(job)
+        return jobs
+
     def fusion_stats(self):
         """
         Outputs count files and plots about the detected gene fusions.
@@ -1228,29 +1252,6 @@ pandoc --to=markdown \\
             category_table_job,
             category_barplot_job
         ], name="fusion_stats")
-
-        jobs.append(job)
-        return jobs
-
-    def validate_fusions(self):
-        """
-        Compares the pipeline output in merged.cff.reann.dnasupp.bwafilter.30.cluster with the predetermined
-        fusion gene test file.This step should be run only with a test .bam/.fastq file, in order to confirm 
-        detection of validated fusions which are known to bepresent in the sample.
-        Requires --valfile flag, with corresponding file containing gene pairs
-        """
-        cff_dir = os.path.join("fusions", "cff")
-        cluster_file = os.path.join(cff_dir, "merged.cff.reann.dnasupp.bwafilter.30.cluster")
-        out_dir = os.path.join("fusions", "validate_fusions")
-        jobs = []
-        intersect_breakpoints_job = validate_fusions.intersect_breakpoints_with_bedfile(cluster_file, cff_dir)
-        validate_fusions_job = validate_fusions.validate_fusions(cff_dir, out_dir, self.args.valfile.name)
-
-        job = concat_jobs([
-            Job(command="mkdir -p " + out_dir),
-            intersect_breakpoints_job,
-            validate_fusions_job
-        ], name="validate_fusions")
 
         jobs.append(job)
         return jobs
@@ -1309,7 +1310,7 @@ pandoc --to=markdown \\
             self.custom_filters,
             #self.fusioninspector,
             #self.fusion_stats,
-            #self.validate_fusions,
+            self.validate_fusions,
             self.delete_fastqs
         ]
 
