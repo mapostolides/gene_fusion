@@ -1,8 +1,3 @@
-#!/usr/bin/env python
-
-################################################################################
-# Copyright (C) 2014, 2015 GenAP, McGill University and Genome Quebec Innovation Centre
-#
 # This file is part of MUGQIC Pipelines.
 #
 # MUGQIC Pipelines is free software: you can redistribute it and/or modify
@@ -26,22 +21,22 @@ import os
 from core.config import *
 from core.job import *
 
-def verify (input_bam, input_vcf, output_prefix, job_name = None ):
+def fusionannotator_db_hits(outdir, cluster, ini_section='fusion_stats'):
+    """ 
+    Run FusionAnnotator and create cancer DB files
+    """
+    #output_file=    --> file which is "final output file" to check that step finished properly
+    cancer_cluster = os.path.join(outdir, "merged.cff.renamed.reann.cluster.blck_filter.RT_filter.callerfilter2.ANC_filter.CANCER_FUSIONS")
+    normal_cluster = os.path.join(outdir, "merged.cff.renamed.reann.cluster.blck_filter.RT_filter.callerfilter2.ANC_filter..NORMALS")
+
     return Job(
-        [ input_bam, input_vcf ],
-        [ output_prefix + ".selfSM" ],
-        [
-            ['dnaseq_qc', 'module_verify_bam_ID']
-        ],
+        [cluster],
+        [cancer_cluster, normal_cluster],
+        [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
-verifyBamID  \\
---vcf {input_vcf} \\
---bam {input_bam} \\
---out {output_prefix} \\
---verbose --ignoreRG --noPhoneHome""".format(
-            input_vcf=input_vcf,
-            input_bam=input_bam,
-            output_prefix=output_prefix
+module load libdb/4.7; source /home/mapostolides/miniconda3/etc/profile.d/conda.sh; /hpf/largeprojects/ccmbio/mapostolides/MODULES/RUN_BENCHMARKING_TOOLKIT/run_FusionAnnotator_cluster.sh {outdir} {cluster} """.format(
+        outdir=outdir,
+        cluster=cluster
         ),
-        name=job_name if job_name else "verifyBamID"
+        removable_files=[]
     )

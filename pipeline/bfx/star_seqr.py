@@ -47,9 +47,9 @@ def run(fastqs1, fastqs2, output_dir, sample_name):
         [
         ['run_star_seqr', 'module_star']
         ],
-
+    #module purge;source /home/mapostolides/miniconda3/etc/profile.d/conda.sh; conda activate starseqr2;starseqr.py -t {threads} {options} \\
         command="""\
-    module purge;source /home/mapostolides/miniconda3/etc/profile.d/conda.sh; conda activate starseqr2;starseqr.py -t {threads} {options} \\
+    module purge;source /hpf/largeprojects/ccmbio/mapostolides/MODULES/miniconda3/etc/profile.d/conda.sh; conda activate starseqr;starseqr.py -t {threads} {options} \\
       -i {genome_build} \\
       -g {gene_annot} \\
       -r {reference} \\

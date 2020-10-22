@@ -26,11 +26,11 @@ import os
 from core.config import *
 from core.job import *
 #['run_arriba', 'module_arriba'],
-def run(fastqs1, fastqs2, top_dir, output_dir):
+def run(fastq1, fastq2, top_dir, output_dir):
     output_file = os.path.join(output_dir, "fusions.tsv")
     arriba_outdir_abspath=os.path.join(top_dir, output_dir)
     return Job(
-        fastqs1,
+        [fastq1, fastq2],
         [output_file],
         [
             ['run_arriba', 'module_star'],
@@ -45,15 +45,17 @@ def run(fastqs1, fastqs2, top_dir, output_dir):
       {blacklist} \\
       {fastq1} \\
       {fastq2} \\
-      {threads} && ls -d {output_dir}/* | grep -v 'fusions.*.tsv\|Chimeric.out.junction' | xargs rm -rf """.format(
+      {threads} && ls -d {output_dir}/* | grep -v 'fusions.*.tsv' | xargs rm -rf """.format(
             genome_build=config.param('run_arriba', 'genome_build'),
             gene_annot=config.param('run_arriba', 'gene_annot'),
             reference=config.param('run_arriba', 'reference'),
             blacklist=config.param('run_arriba', 'blacklist'),
             threads=config.param('run_arriba', 'threads', type='posint'),
             options=config.param('run_arriba', 'options'),
-            fastq1=",".join(fastq1 for fastq1 in fastqs1),
-            fastq2=",".join(fastq2 for fastq2 in fastqs2),
+            fastq1=fastq1,
+            fastq2=fastq2,
+            #fastq1=",".join(fastq1 for fastq1 in fastqs1),
+            #fastq2=",".join(fastq2 for fastq2 in fastqs2),
             output_dir=arriba_outdir_abspath
         ),
     )

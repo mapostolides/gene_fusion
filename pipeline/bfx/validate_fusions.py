@@ -33,7 +33,7 @@ def validate_fusions(outdir, cluster, truth_fusions, ini_section='fusion_stats')
         [],
         [["merge_and_reannotate_cff_fusion", "module_fusiontools"]],
         command="""\
-module load libdb/4.7; /hpf/largeprojects/ccmbio/mapostolides/MODULES/RUN_BENCHMARKING_TOOLKIT/benchmarking_cluster-GENAP.sh {outdir} {truth_fusions} {cff} {cluster} true true true true false""".format(
+module load libdb/4.7; /hpf/largeprojects/ccmbio/mapostolides/MODULES/RUN_BENCHMARKING_TOOLKIT/benchmarking_cluster-GENAP.sh {outdir} {truth_fusions} {cff} {cluster} true """.format(
         outdir=outdir,
         truth_fusions=truth_fusions,
         cff=cff,

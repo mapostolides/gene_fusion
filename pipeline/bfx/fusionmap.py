@@ -36,16 +36,20 @@ def fusionmap(in1fastq, in2fastq, out_dir, top_dir, config_file=None, ini_sectio
     fastq_path = os.path.dirname(in2fastq)
     link2fastq = os.path.join(fastq_path, "tmplink_2.fastq")
     result_file = os.path.join(out_dir, "02_RNA.FusionReport.txt")
-    top_dir="/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules"
+    #top_dir="/hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules"
 # The below command can be used to create a new installation of FusionMap in the output directory
 # For now I am trying to just use my local copy of FusionMap and not create a new one each run, as this seems to be creating conflicts
 #cp -R -u -p /hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/FusionMap_2015-03-31 {top_dir}/ && \\
+#cp -TRv /hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/FusionMap_2015-03-31 {top_dir}/  && \\
+#/hpf/largeprojects/ccmbio/epigen/test_runs/run_fusion/output-July-2-2020/FusionMap_2015-03-31-TMP/
+
     return Job(
         [in1fastq, in2fastq, config_file if config_file else None],
         [result_file],
         [["fusionmap", "module_fusionmap"],
          ["DEFAULT", "module_mono"]],
         command="""\
+cp -TRv /hpf/largeprojects/ccmbio/mapostolides/gene_fusion/modules/FusionMap_2015-03-31 {out_dir}/FusionMap_2015-03-31  && \\
 ln -sf $PWD/{in1fastq} {link1fastq} && \\
 ln -sf $PWD/{in2fastq} {link2fastq} && \\
 echo "\n<Files>\n{link1fastq}\n{link2fastq}\n<Output>\nTempPath={out_dir}/FusionMapTemp\nOutputPath={out_dir}\nOutputName={out_prefix}" \\
@@ -55,7 +59,7 @@ cat {out_dir}/tmp.cfg \\
   >{out_dir}/fusionmap.cfg && \\
 /hpf/tools/centos6/mono/2.10.9/bin/mono \\
   /hpf/tools/centos6/Oshell/20170421/oshell.exe \\
-  --semap {top_dir}/FusionMap_2015-03-31 \\
+  --semap {out_dir}/FusionMap_2015-03-31 \\
   Human.B37.3 \\
   RefGene \\
   {out_dir}/fusionmap.cfg \\

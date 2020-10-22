@@ -50,7 +50,11 @@ def integrate(accepted_bam, unmapped_bam, out_dir, ini_section='integrate'):
         ),
         removable_files=[]
     )
+#/hpf/largeprojects/ccmbio/mapostolides/MODULES/INTEGRATE/annot.ucsc.txt
+#/hpf/largeprojects/ccmbio/jiangyue/tools/INTEGRATE_0_2_0/Integrate/annot.ucsc.txt
 
+#/hpf/largeprojects/ccmbio/mapostolides/MODULES/Integrate/INTEGRATE-build/bin/Integrate
+#/hpf/largeprojects/ccmbio/jiangyue/tools/INTEGRATE_0_2_0/Integrate/INTEGRATE-build/bin/Integrate fusion
 def make_result_file(out_dir, ini_section='make_integrate_result_file'):
 
     other_options = config.param(ini_section, 'other_options', required=False)
