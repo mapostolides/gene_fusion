@@ -50,6 +50,8 @@ from bfx import integrate
 from bfx import ericscript
 from bfx import chimerascan 
 from bfx import metafusion 
+from bfx import metafusion_isohunter 
+from bfx import metafusion_clinical 
 
 from bfx import gunzip
 from bfx import merge_fastq
@@ -142,6 +144,8 @@ class RnaFusion(common.Illumina):
         # add optional fusion validation file for pipeline validation mode
         self.argparser.add_argument("--valfile", required=False, help="fusion validation set file", type=file)
         self.argparser.add_argument("--callers", required=False, help="comma-separated string of callers to be used")
+        self.argparser.add_argument("--keep_bams", required=False,  action='store_true', help="if this flag is used, keep caller bams")
+        self.argparser.add_argument("--database", required=False, help="specifies database path for historical fusions, FP list and clinical fusions")
         #Class variables
         self.tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "integrate", "defuse"]
         #self.tool_list = ["star_seqr", "arriba", "star_fusion", "fusionmap", "ericscript", "defuse"]
@@ -342,7 +346,7 @@ class RnaFusion(common.Illumina):
             job = concat_jobs([
                 Job(command="mkdir -p " + output_dir),
                 chgdir_job,
-                arriba.run(left_fastq, right_fastq, self._output_dir, output_dir),
+                arriba.run(left_fastq, right_fastq, self._output_dir, output_dir, keep_bam=self.args.keep_bams),
                 back_to_outdir_job
             ], name="run_arriba." + sample.name)
 
@@ -379,7 +383,7 @@ class RnaFusion(common.Illumina):
 
             job = concat_jobs([
                 Job(command="mkdir -p " + output_dir),
-                star_seqr.run(left_fastq, right_fastq, output_dir, sample.name)
+                star_seqr.run(left_fastq, right_fastq, output_dir, sample.name, keep_bam=self.args.keep_bams)
             ], name="run_star_seqr." + sample.name)
         
             job.samples = [sample]
@@ -398,7 +402,7 @@ class RnaFusion(common.Illumina):
             fastq1, fastq2 = self.select_input_fastq(sample)
             out_dir = os.path.join("fusions", "star_fusion", sample.name)
             #star_fusion_job = star_fusion.star_fusion(fastq1, fastq2, out_dir, CTAT_resource_lib)
-            star_fusion_job = star_fusion.star_fusion(fastq1, fastq2, CTAT_resource_lib, out_dir)
+            star_fusion_job = star_fusion.star_fusion(fastq1, fastq2, CTAT_resource_lib, out_dir, keep_bam=self.args.keep_bams)
             job = concat_jobs([
                 Job(command="mkdir -p " + out_dir),
                 star_fusion_job
@@ -417,7 +421,7 @@ class RnaFusion(common.Illumina):
         for sample in self.samples:
             fastq1, fastq2 = self.select_input_fastq(sample)
             out_dir = os.path.join("fusions", "defuse", sample.name)
-            defuse_job = defuse.defuse(fastq1, fastq2, out_dir)
+            defuse_job = defuse.defuse(fastq1, fastq2, out_dir, keep_bam=self.args.keep_bams)
             job = concat_jobs([
                 Job(command="mkdir -p " + out_dir),
                 defuse_job
@@ -461,7 +465,7 @@ class RnaFusion(common.Illumina):
         for sample in self.samples:
             fastq1, fastq2 = self.select_input_fastq(sample)
             out_dir = os.path.join("fusions", "ericscript", sample.name)
-            ericscript_job = ericscript.ericscript(fastq1, fastq2, out_dir)
+            ericscript_job = ericscript.ericscript(fastq1, fastq2, out_dir, keep_bam=self.args.keep_bams)
             job = concat_jobs([
                 Job(command="mkdir -p " + out_dir),
                 Job(command="rm -r " + out_dir),
@@ -544,10 +548,13 @@ class RnaFusion(common.Illumina):
         for sample in self.samples:
             
             # Define result files
-            star_seqr_result = os.path.join("fusions", "star_seqr", sample.name, "out_STAR-SEQR", "out_STAR-SEQR_candidates.txt")
+            #output_file = os.path.join(output_dir, prefix + "_STAR-SEQR", prefix  + "_STAR-SEQR_candidates.txt")
+            #star_seqr_result = os.path.join("fusions", "star_seqr", sample.name, "out_STAR-SEQR", "out_STAR-SEQR_candidates.txt")
+            star_seqr_result = os.path.join("fusions", "star_seqr", sample.name, "out_STAR-SEQR_candidates.txt")
             #print >> sys.stderr, star_seqr_result 
             arriba_result = os.path.join("fusions", "arriba", sample.name, "fusions.tsv")
-            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
+            #star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.tsv")
+            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.coding_effect.tsv")
             defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
             fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
@@ -631,7 +638,7 @@ class RnaFusion(common.Illumina):
         jobs = []
         cff_dir_abspath = os.path.join(self._output_dir, "fusions", "cff")
         out_dir_abspath = os.path.join(self._output_dir, "fusions", "metafusion")
-        metafusion_job = metafusion.run_metafusion_singularity(cff_dir_abspath, out_dir_abspath)
+        metafusion_job = metafusion.run_metafusion_singularity(out_dir_abspath)
         #metafusion_job.name = "MetaFusion"
         job = concat_jobs([
             Job(command="mkdir -p " + out_dir_abspath),
@@ -642,23 +649,72 @@ class RnaFusion(common.Illumina):
         
         return jobs
 
+
+    def MetaFusion_IsoHunter(self):
+        """
+        Run MetaFusion.IsoHunter
+        """
+        jobs = []
+        out_dir_abspath = self._output_dir
+        isohunter_outdir = os.path.join("fusions", "metafusion_isohunter") 
+        metafusion_job = metafusion_isohunter.run_isohunter_singularity(out_dir_abspath)
+        job = concat_jobs([
+            Job(command="mkdir -p " + isohunter_outdir),
+            metafusion_job
+        ], name="MetaFusion.IsoHunter")
+
+        jobs.append(job)
+
+        return jobs
+
+    def MetaFusion_clinical(self):
+        """
+        Run MetaFusion.IsoHunter.clinical
+        """
+        jobs = []
+        out_dir_abspath = self._output_dir
+        metafusion_outdir = os.path.join("fusions", "metafusion_clinical")
+        metafusion_job = metafusion_clinical.run_metafusion_clinical(out_dir_abspath, self.args.database)
+        job = concat_jobs([
+            Job(command="mkdir -p " + metafusion_outdir),
+            metafusion_job
+        ], name="MetaFusion.clinical")
+
+        jobs.append(job)
+
+        return jobs
+
+
     def delete_fastqs(self):
         """
-        Delete fastqs when all callers' jobs are finished
+        Delete fastqs when all callers' jobs are finished                                                     
         """
         jobs = []
         for sample in self.samples:
-            defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")
-            fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")
+            defuse_result = os.path.join("fusions", "defuse", sample.name, "results.filtered.tsv")            
+            fusionmap_result = os.path.join("fusions", "fusionmap", sample.name, "02_RNA.FusionReport.txt")   
             ericscript_result = os.path.join("fusions", "ericscript", sample.name, "fusion.results.filtered.tsv")
-            integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")
-            result_file_list = [defuse_result, fusionmap_result, ericscript_result, integrate_result]
-            del_job = delete_fastqs.delete_fastqs(sample.name, result_file_list)
+            integrate_result = os.path.join("fusions", "integrate", sample.name, "breakpoints.cov.tsv")       
+            star_seqr_result = os.path.join("fusions", "star_seqr", sample.name, "out_STAR-SEQR_candidates.txt")
+            arriba_result = os.path.join("fusions", "arriba", sample.name, "fusions.tsv")
+            star_fusion_result = os.path.join("fusions", "star_fusion", sample.name, "star-fusion.fusion_predictions.abridged.coding_effect.tsv")
+
+            #result_file_list = [defuse_result, fusionmap_result, ericscript_result, integrate_result, star_seqr_result, arriba_result, star_fusion_result] 
+            result_file_list = [defuse_result, fusionmap_result]
+            del_job = delete_fastqs.delete_fastqs(sample.name, result_file_list) 
             job = concat_jobs([
                 Job(command="mkdir -p delete_fastqs"),
                 del_job
             ], name="delete_fastqs." + sample.name)
+            #job = concat_jobs([
+            #    Job(command="mkdir -p delete_fastqs")
+            #], name="delete_fastqs." + sample.name)
             jobs.append(job)
+            # DELETE BAMS JOB (one across all samples)
+        del_bams_job = concat_jobs([
+               delete_fastqs.delete_bams(result_file_list, self._output_dir)
+               ], name="delete_bams") 
+        jobs.append(del_bams_job)
         return jobs
 
     @property
@@ -678,7 +734,10 @@ class RnaFusion(common.Illumina):
             self.integrate_make_result_file,
             self.convert_fusion_results_to_cff,
             self.merge_cff_fusion,
-            self.MetaFusion,
+    #        self.MetaFusion,
+            self.MetaFusion_clinical,
+            self.delete_fastqs,
+            self.MetaFusion_IsoHunter,
             self.chimerascan
         ]
 

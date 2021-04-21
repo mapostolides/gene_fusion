@@ -26,10 +26,14 @@ import os
 from core.config import *
 from core.job import *
 
-def run_metafusion_singularity(cff_dir, out_dir, genome_fasta=None, gene_info=None, gene_bed=None, recurrent_bedpe=None, ini_section='metafusion'):
+def run_metafusion_singularity(out_dir_abspath, genome_fasta=None, gene_info=None, gene_bed=None, recurrent_bedpe=None, ini_section='metafusion'):
     num_tools = config.param('metafusion', 'num_tools', type='int')
-    cff = os.path.join(cff_dir, "merged.cff")
-    metafusion_dir="/hpf/largeprojects/ccmbio/mapostolides/MetaFusion"
+
+    cff_dir_abspath = os.path.join(out_dir_abspath, "fusions", "cff")
+    metafusion_outdir_abspath = os.path.join(out_dir_abspath, "fusions", "metafusion")
+
+    cff = os.path.join("fusions", "cff", "merged.cff")
+    code_dir="/hpf/largeprojects/ccmbio/mapostolides/MetaFusion"
 
     return Job(
         [cff],
@@ -37,9 +41,9 @@ def run_metafusion_singularity(cff_dir, out_dir, genome_fasta=None, gene_info=No
         [],
         command="""\
 module load Singularity; \\
-cd {metafusion_dir}/scripts ;\\ 
-singularity exec -B /home -B {metafusion_dir} -B /tmp -B /localhd/tmp -B {cff_dir} -B {out_dir} {metafusion_dir}/MetaFusion.simg \\
-bash MetaFusion.sh --outdir {out_dir} \\
+cd {code_dir}/scripts ;\\ 
+singularity exec -B /home -B {code_dir} -B /tmp -B /localhd/tmp -B {cff_dir_abspath} -B {metafusion_outdir_abspath} {code_dir}/MetaFusion.simg \\
+bash MetaFusion.sh --outdir {metafusion_outdir_abspath} \\
   --cff {cff} \\
   --gene_bed {gene_bed} \\
   --fusion_annotator \\
@@ -47,11 +51,11 @@ bash MetaFusion.sh --outdir {out_dir} \\
   --gene_info {gene_info} \\
   --num_tools={num_tools} \\
   --recurrent_bedpe {recurrent_bedpe} \\
-  --scripts {metafusion_dir}/scripts""".format(
+  --scripts {code_dir}/scripts""".format(
         cff=cff,
-        metafusion_dir=metafusion_dir,
-        cff_dir=cff_dir,
-        out_dir=out_dir,
+        code_dir=code_dir,
+        metafusion_outdir_abspath=metafusion_outdir_abspath,
+        cff_dir_abspath=cff_dir_abspath,
         num_tools=str(num_tools),
         gene_bed=gene_bed if gene_bed else config.param(ini_section, 'gene_bed', type='filepath'),
         genome_fasta=genome_fasta if genome_fasta else config.param(ini_section, 'genome_fasta', type='filepath'),
@@ -60,33 +64,3 @@ bash MetaFusion.sh --outdir {out_dir} \\
         ),
         removable_files=[]
     )
-
-
-#topdir=/hpf/largeprojects/ccmbio/mapostolides
-#fusiontools=$topdir/MetaFusion/scripts
-##REFERENCE FILES FILES
-##runs_dir=$topdir/MetaFusion/RUNS
-#runs_dir=/hpf/largeprojects/ccmbio/mapostolides/Sandbox/RUNS
-#mkdir $runs_dir
-#gene_bed=$topdir/MetaFusion/reference_files/ens_known_genes.renamed.ENSG.bed
-#gene_info=$topdir/MetaFusion/reference_files/Homo_sapiens.gene_info
-#genome_fasta=$topdir/MetaFusion/reference_files/human_g1k_v37_decoy.fasta
-#recurrent_bedpe=$topdir/MetaFusion/reference_files/blocklist_breakpoints.bedpe
-#
-#date=Oct-19-2020.MetaFusion_command
-#echo trusight 
-#outdir=$runs_dir/trusight.$date
-#echo generating output in $outdir
-#mkdir $outdir
-#cff=$topdir/MetaFusion/test_data/trusight_cff/trusight.cff
-#
-#cd /hpf/largeprojects/ccmbio/mapostolides/MetaFusion/scripts
-#singularity exec -B /home -B /hpf/largeprojects/ccmbio/mapostolides/MetaFusion -B /tmp -B /localhd/tmp -B /hpf/largeprojects/ccmbio/mapostolides/Sandbox/RUNS /hpf/largeprojects/ccmbio/mapostolides/MetaFusion/MetaFusion.simg bash MetaFusion.sh --outdir $outdir \
-#                 --cff $cff  \
-#                 --gene_bed $gene_bed \
-#                 --fusion_annotator \
-#                 --genome_fasta $genome_fasta \
-#                 --gene_info $gene_info \
-#                 --num_tools=2  \
-#                 --recurrent_bedpe $recurrent_bedpe \
-#                 --scripts $fusiontools

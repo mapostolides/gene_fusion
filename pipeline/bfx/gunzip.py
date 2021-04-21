@@ -36,7 +36,7 @@ def gunzip_fastq(infastqgz, out_dir, ini_section='gunzip_fastq'):
             [outfastq],
             [],
             command="""\
-zcat {input} > {output}""".format(
+date;sleep 5m;date; zcat {input} > {output}""".format(
             input=infastqgz,    
             output=outfastq
             )

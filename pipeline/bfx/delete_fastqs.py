@@ -28,25 +28,44 @@ from core.job import *
 
 
 
-def delete_fastqs(sample, fusion_result_file, ini_section='delete_fastqs'):
-	#defuse_result = os.path.join("fusions", "defuse", sample, "results.filtered.tsv")
-	#fusionmap_result = os.path.join("fusions", "fusionmap", sample, "02_RNA.FusionReport.txt")
-	#ericscript_result = os.path.join("fusions", "ericscript", sample, "fusion.results.filtered.tsv")
-	#integrate_result = os.path.join("fusions", "integrate", sample, "breakpoints.tsv")
-
+def delete_fastqs(sample, result_file_list, ini_section='delete_fastqs'):
 	out_file=os.path.join("delete_fastqs", "done")
+        #bam_lst = [os.path.join(os.path.dirname(result_file), "*bam*") for result_file in result_file_list] 
+        #print(" ".join(bam_lst))
+        #print(bam_lst)
 
+#		eric_out=os.path.join("fusions", "ericscript", sample, "out"),
 	return Job(
-		fusion_result_file,
+		result_file_list,
 		[out_file],
 		[],
 		command="""\
-rm -rf {fastq_folder} && rm -f {tophat2_bam} && touch {out_file}""".format(
-		fastq_folder=os.path.join("fusions", "gunzip_fastq", sample),
-		eric_out=os.path.join("fusions", "ericscript", sample, "out"),
-		tophat2_bam=os.path.join("fusions", "tophat2", sample, "*.ba?"),
+rm -rf {fastq_folder} && rm -rf {tophat2_bam} && touch {out_file}""".format(
+		fastq_folder=os.path.join("fusions", "gunzip_fastq"),
+		tophat2_bam=os.path.join("fusions", "tophat2"),
 		out_file=out_file
 		),
 		removable_files=[]
 	)
+#		fastq_folder=os.path.join("fusions", "gunzip_fastq", sample),
+#		tophat2_bam=os.path.join("fusions", "tophat2", sample, "*.ba?"),
 
+def delete_bams(result_file_list, topdir, ini_section='delete_fastqs'):                     
+        out_file=os.path.join("delete_fastqs", "done")                                        
+        #bam_lst = [os.path.join(os.path.dirname(result_file), "*bam*") for result_file in result_file_list] 
+        #print(" ".join(bam_lst))
+        #print(bam_lst)
+
+#               eric_out=os.path.join("fusions", "ericscript", sample, "out"),                
+        return Job(
+                result_file_list,
+                [out_file],
+                [],
+                command="""\
+find {topdir}/fusions | grep -v metafusion | grep -v cff | grep 'bam\|sam' | xargs rm""".format(
+                out_file=out_file,
+                topdir=topdir
+                ),
+                removable_files=[]
+        )
+#find {topdir}/fusions | grep -v metafusion | grep -v cff | grep bam > {topdir}/bam_paths.txt""".format(

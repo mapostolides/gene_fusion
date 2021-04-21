@@ -32,12 +32,33 @@ def cff_convert(sample, fusion_result_file, sample_info_file, tool, out_dir, ini
         [os.path.join(out_dir, sample+"."+tool+".cff")],
         [['cff_conversion', 'module_fusiontools']],
         command="""\
-convert_fusion_results_to_cff.py \\
-  {sample} \\
-  {sample_info_file} \\
-  {tool} \\
-  {fusion_result_file} \\
-  {out_dir}""".format(
+/hpf/largeprojects/ccmbio/mapostolides/MetaFusion.IsoHunter/scripts/convert_fusion_results_to_cff.py \\
+  --sample {sample} \\
+  --sample_info_file {sample_info_file} \\
+  --tool {tool} \\
+  --fusion_result_file {fusion_result_file} \\
+  --outdir {out_dir}""".format(
+        sample=sample,
+        sample_info_file=sample_info_file,
+        fusion_result_file=fusion_result_file,
+        tool=tool,
+        out_dir=out_dir
+        ),
+        removable_files=[]
+    )
+
+def cff_convert_OLD(sample, fusion_result_file, sample_info_file, tool, out_dir, ini_section='cff_conversion'):
+    return Job(
+        [fusion_result_file],
+        [os.path.join(out_dir, sample+"."+tool+".cff")],
+        [['cff_conversion', 'module_fusiontools']],
+        command="""\
+convert_fusion_results_to_cff.MetaFusion.py \\
+  --sample {sample} \\
+  --sample_info_file {sample_info_file} \\
+  --tool {tool} \\
+  --fusion_result_file {fusion_result_file} \\
+  --outdir {out_dir}""".format(
         sample=sample,
         sample_info_file=sample_info_file,
         fusion_result_file=fusion_result_file,

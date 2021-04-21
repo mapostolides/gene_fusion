@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 
 #['run_star_seqr', 'module_starseqr_python'],
 #            ['run_star_seqr', 'module_star']
-def run(fastqs1, fastqs2, output_dir, sample_name):
+def run(fastqs1, fastqs2, output_dir, sample_name, keep_bam):
     if not isinstance(fastqs1, list):
         fastqs1 = [fastqs1]
         
@@ -39,8 +39,13 @@ def run(fastqs1, fastqs2, output_dir, sample_name):
         fastqs2 = [fastqs2]
     prefix="out"
     #output_file = os.path.join(output_dir + "_STAR-SEQR", sample_name + "_STAR-SEQR_candidates.txt")
-    output_file = os.path.join(output_dir, prefix + "_STAR-SEQR", prefix  + "_STAR-SEQR_candidates.txt")
+    #output_dir = os.path.join("fusions", "star_seqr", sample.name)
+    #output_file = os.path.join(output_dir, prefix + "_STAR-SEQR", prefix  + "_STAR-SEQR_candidates.txt")
+    output_file = os.path.join(output_dir, prefix  + "_STAR-SEQR_candidates.txt")
     #fusions/star_seqr/smc_rna_sim45/out_STAR-SEQR/out_STAR-SEQR_candidates.txt
+
+    if keep_bam: keep_bam=str(1)
+    else: keep_bam=str(0)
     return Job(
         fastqs1 + fastqs2,
         [output_file],
@@ -55,7 +60,9 @@ def run(fastqs1, fastqs2, output_dir, sample_name):
       -r {reference} \\
       -1 {fastq1} \\
       -2 {fastq2} \\
-      -p {output_dir}/{prefix} && ls -d {output_dir}/{prefix}_STAR-SEQR/* | grep -v 'candidates\|breakpoints\|Chimeric.out.junction' | xargs rm -rf  """.format(
+      -p {output_dir}/{prefix} && ls -d {output_dir}/{prefix}_STAR-SEQR/* | grep -v 'candidates\|breakpoints\|bam' | xargs rm -rf;\\
+      num=$(cat {output_dir}/out_STAR-SEQR.log  | grep "No candidates left to process" | wc -l ); if [ $num -gt 0 ];then  cp {output_dir}/{prefix}_STAR-SEQR/out_STAR-SEQR_breakpoints.txt {output_dir}/{prefix}_STAR-SEQR/out_STAR-SEQR_candidates.txt ;fi;  \\
+       mv {output_dir}/{prefix}_STAR-SEQR/out_STAR-SEQR_candidates.txt {output_dir}/out_STAR-SEQR_candidates.txt""".format(
             genome_build=config.param('run_star_seqr', 'genome_build'),
             gene_annot=config.param('run_star_seqr', 'gene_annot'),
             reference=config.param('run_star_seqr', 'reference'),
@@ -67,4 +74,7 @@ def run(fastqs1, fastqs2, output_dir, sample_name):
             prefix=prefix
         ),
     )
+#      -p {output_dir}/{prefix} && ls -d {output_dir}/{prefix}_STAR-SEQR/* | grep -v 'candidates\|breakpoints\|bam' | xargs rm -rf;\\
+#      -p {output_dir}/{prefix} && ls -d {output_dir}/{prefix}_STAR-SEQR/* | grep -v 'candidates\|breakpoints\|Chimeric.out.junction' | xargs rm -rf;\\
       #&& ls -d {output_dir}/{prefix}_STAR-SEQR | grep -v 'candidates\|breakpoints\|Chimeric.out.junction' | xargs rm -rf """.format(
+#num=$(cat {output_dir}/out_STAR-SEQR.log  | grep "No candidates left to process" | wc -l ); if [ $num -gt 0 ];then  cp /hpf/largeprojects/ccmbio/mapostolides/gene_fusion/pipeline/config_reference_files/out_STAR-SEQR_candidates.header.txt {output_dir}/{prefix}_STAR-SEQR/out_STAR-SEQR_candidates.txt ;fi

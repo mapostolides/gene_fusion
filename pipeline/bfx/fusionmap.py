@@ -63,7 +63,8 @@ cat {out_dir}/tmp.cfg \\
   Human.B37.3 \\
   RefGene \\
   {out_dir}/fusionmap.cfg \\
-  {other_options}""".format(
+  {other_options} && \\
+  rm -rf {out_dir}/FusionMap_2015-03-31""".format(
         other_options=" \\\n  " + other_options if other_options else "",
         config_file=config.param(ini_section, 'config_file'),
         in1fastq=in1fastq,

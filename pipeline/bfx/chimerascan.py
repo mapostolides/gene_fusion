@@ -40,7 +40,7 @@ def run(fastq1, fastq2, output_dir, ini_section='chimerascan'):
         #[]
         ],
         command="""\
-    module purge;source /hpf/largeprojects/ccmbio/mapostolides/MODULES/miniconda3/etc/profile.d/conda.sh; conda activate chimerascan;chimerascan_run.py {index} {fastq1} {fastq2} {output_dir}""".format(
+    module purge;source /hpf/largeprojects/ccmbio/mapostolides/MODULES/miniconda3/etc/profile.d/conda.sh; conda activate chimerascan;chimerascan_run.py {index} {fastq1} {fastq2} {output_dir}&& ls -d {out_dir}/*|grep -v chimeras.bedpe | xargs rm -rf """.format(
             index=index,
             fastq1=fastq1,
             fastq2=fastq2,

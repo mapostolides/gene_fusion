@@ -26,9 +26,13 @@ import os
 from core.config import *
 from core.job import *
 #['run_arriba', 'module_arriba'],
-def run(fastq1, fastq2, top_dir, output_dir):
+def run(fastq1, fastq2, top_dir, output_dir, keep_bam):
     output_file = os.path.join(output_dir, "fusions.tsv")
     arriba_outdir_abspath=os.path.join(top_dir, output_dir)
+
+    if keep_bam: keep_bam=str(1)
+    else: keep_bam=str(0)
+
     return Job(
         [fastq1, fastq2],
         [output_file],
@@ -45,7 +49,7 @@ def run(fastq1, fastq2, top_dir, output_dir):
       {blacklist} \\
       {fastq1} \\
       {fastq2} \\
-      {threads} && ls -d {output_dir}/* | grep -v 'fusions.*.tsv' | xargs rm -rf """.format(
+      {threads} && if [ {keep_bam} -eq 1 ];then ls -d {output_dir}/* |grep -v 'fusions.*.tsv\|bam\|sam' | xargs rm -rf; else ls -d {output_dir}/* | grep -v 'fusions.*.tsv' | xargs rm -rf; fi """.format( 
             genome_build=config.param('run_arriba', 'genome_build'),
             gene_annot=config.param('run_arriba', 'gene_annot'),
             reference=config.param('run_arriba', 'reference'),
@@ -54,8 +58,11 @@ def run(fastq1, fastq2, top_dir, output_dir):
             options=config.param('run_arriba', 'options'),
             fastq1=fastq1,
             fastq2=fastq2,
+            keep_bam=keep_bam,
             #fastq1=",".join(fastq1 for fastq1 in fastqs1),
             #fastq2=",".join(fastq2 for fastq2 in fastqs2),
             output_dir=arriba_outdir_abspath
         ),
     )
+      #{threads} && ls -d {output_dir}/* | grep -v 'fusions.*.tsv' | xargs rm -rf """.format(
+#{threads} && if [ {keep_bam} -eq 1 ];then ls -d {output_dir}/* |grep -v 'fusions.*.tsv\|bam\|sam' | xargs rm -rf; else ls -d {output_dir}/* | grep -v 'fusions.*.tsv' | xargs rm -rf; fi """.format( 

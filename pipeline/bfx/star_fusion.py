@@ -27,10 +27,14 @@ from core.config import *
 from core.job import *
 
 #def star_fusion(in1fastq, in2fastq, out_dir, CTAT_resource_lib, config_file=None, ini_section='star_fusion'):
-def star_fusion(in1fastq, in2fastq, CTAT_resource_lib, out_dir, config_file=None, ini_section='star_fusion'):
+#def star_fusion(in1fastq, in2fastq, CTAT_resource_lib, out_dir, keep_bam=False, config_file=None, ini_section='star_fusion'):
+def star_fusion(in1fastq, in2fastq, CTAT_resource_lib, out_dir, keep_bam, config_file=None, ini_section='star_fusion'):
 
     other_options = config.param(ini_section, 'other_options', required=False)
-    result_file = os.path.join(out_dir, "star-fusion.fusion_predictions.abridged.tsv")
+    #result_file = os.path.join(out_dir, "star-fusion.fusion_predictions.abridged.tsv")
+    result_file = os.path.join(out_dir, "star-fusion.fusion_predictions.abridged.coding_effect.tsv")
+    if keep_bam: keep_bam=str(1)
+    else: keep_bam=str(0)
  
     return Job(
         [in1fastq, in2fastq, config_file if config_file else None],
@@ -41,17 +45,21 @@ STAR-Fusion --CPU 8 \\
   {other_options} \\
   --left_fq {in1fastq} \\
   --right_fq {in2fastq} \\
+  --examine_coding_effect \\
   --genome_lib_dir {CTAT_resource_lib} \\
-  --output_dir {out_dir} && ls -d {out_dir}/*|grep -v predictions | xargs rm -rf """.format(
+  --output_dir {out_dir};if [ {keep_bam} -eq 1 ];then ls -d {out_dir}/*|grep -v 'predictions\|bam' | xargs rm -rf; else ls -d {out_dir}/*|grep -v predictions | xargs rm -rf; fi """.format(
         other_options= other_options if other_options else "",
         in1fastq=in1fastq,
         in2fastq=in2fastq,
         CTAT_resource_lib=CTAT_resource_lib,
-        out_dir= out_dir
+        out_dir= out_dir,
+        keep_bam=keep_bam
         ),
         removable_files=[]
 
     )
+# Code to remove intermediate files:
+  #--output_dir {out_dir} && ls -d {out_dir}/*|grep -v predictions | xargs rm -rf """.format(
 #  --output_dir {out_dir} && ls -d {out_dir}/*|grep -v predictions | xargs rm -rf """.format(
 #        command="""\
 #STAR-Fusion --CPU 8 \\
